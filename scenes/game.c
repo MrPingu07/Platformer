@@ -10,7 +10,7 @@
 #define PLAYER_SIZE   40
 #define JUMP_FORCE -400.0f
 
-// --- Estado de la escena ---
+// --- Scene States ---
 static Player player;
 static Enemy  enemies[4];
 static int    enemy_count;
@@ -18,10 +18,13 @@ static Box    boxes[8];
 static int    box_count;
 static Rectangle platforms[4];
 static int    platform_count;
+static Bullet game_bullets[MAX_BULLETS];
 
 // --- Init ---
 static void game_init(void) {
     player = player_init(100, 300);
+
+    for(int i = 0; i < MAX_BULLETS; i++) game_bullets[i].active = false;
 
     platforms[0] = (Rectangle){200, 350, 150, 20};
     platforms[1] = (Rectangle){400, 280, 120, 20};
@@ -42,6 +45,35 @@ static void game_init(void) {
 static void game_update(float dt) {
     player.on_ground = false;
     player_update(&player, dt);
+
+    // --- Gestión del Inventario (Swap con Q) ---
+    if (IsKeyPressed(KEY_Q)) {
+        player.current_slot = (player.current_slot == 0) ? 1 : 0;
+    }
+
+    // Reducir el cooldown del arma equipada
+    Weapon *current_weapon = &player.inventory[player.current_slot];
+    if (current_weapon->cooldown > 0.0f) {
+        current_weapon->cooldown -= dt;
+    }
+
+    // --- Input de Disparo ---
+    // Calculamos el origen del disparo (Extremo lateral del sprite del jugador)
+    Vector2 fire_origin = {
+        (player.facing == 1) ? player.x + PLAYER_SIZE : player.x,
+        player.y + PLAYER_SIZE / 2.0f
+    };
+
+    bool wants_to_fire = current_weapon->is_automatic ? IsKeyDown(KEY_SPACE) : IsKeyPressed(KEY_SPACE);
+
+    if (wants_to_fire && current_weapon->cooldown <= 0.0f) {
+        // ¡Aquí el arma ejecuta su función modular de disparo!
+        current_weapon->fire_func(fire_origin, player.facing, game_bullets, MAX_BULLETS);
+        current_weapon->cooldown = current_weapon->fire_rate; // Reset del cooldown
+    }
+
+    // Actualizar movimiento de las balas
+    bullets_update(game_bullets, MAX_BULLETS, dt);
 
     // Colisión con plataformas
     for (int i = 0; i < platform_count; i++) {
@@ -97,8 +129,8 @@ static void game_update(float dt) {
         }
 
     }
-// --- Input salto ---
-if (IsKeyPressed(KEY_SPACE) && player.on_ground) {
+// --- Jumping Input ---
+if (IsKeyPressed(KEY_W) && player.on_ground) {
     player.vy       = JUMP_FORCE;
     player.on_ground = false;
     }
@@ -111,6 +143,7 @@ static void game_render(void) {
     ClearBackground(DARKGRAY);
 
     player_render(&player);
+    bullets_render(game_bullets, MAX_BULLETS); // Render bullets
 
     for (int i = 0; i < platform_count; i++)
         DrawRectangleRec(platforms[i], RAYWHITE);

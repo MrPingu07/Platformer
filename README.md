@@ -104,7 +104,7 @@ Tipos de colisión implementados:
 ## Compilación
 
 ```bash
-gcc main.c scenes/game.c entities/player.c entities/enemy.c entities/box.c -o platformer -lraylib -lm
+gcc main.c scenes/game.c entities/player.c entities/enemy.c entities/box.c entities/bullet.c -o platformer -lraylib -lm
 ```
 
 Ejecutar desde la carpeta `Platformer/`.
