@@ -1,23 +1,22 @@
-// ==========================================
-// FILE: entities/bullet.h
-// ==========================================
+// entities/bullet.h
 #pragma once
 #include <raylib.h>
 #include <stdbool.h>
 
+// Buffer constraint for maximum concurrent bullets in the scene
 #define MAX_BULLETS 100
 
-// El objeto físico de la bala
+// Individual projectile physical state
 typedef struct {
     Vector2 position;
     Vector2 velocity;
     float radius;
     Color color;
-    float lifetime; // Kill bullet after X seconds
-    bool active;
+    float lifetime; // Time-to-live tracker (seconds) before auto-deactivation
+    bool isActive;  // Flag to manage memory pool allocation
 } Bullet;
 
-// Enumerator for identigying the weapons
+// Weapon identification index
 typedef enum {
     WEAPON_SEMIAUTO,
     WEAPON_SHOTGUN,
@@ -26,22 +25,22 @@ typedef enum {
     WEAPON_COUNT
 } WeaponType;
 
-// The Contract of what a weapon is
+// Polymorphic Weapon structure
 typedef struct Weapon {
     WeaponType type;
     const char* name;
-    float fire_rate;    // Minimum time between shots
-    float cooldown;     // Remaining time to be able to fire again
-    bool is_automatic;  // Is it shot by keeping it pressed?
+    float fireRate;     // Minimum structural delay between shots (seconds)
+    float cooldown;     // Remaining cooldown time allocation per frame
+    bool isAutomatic;   // Triggers input check type (Hold vs. Press)
 
-    // Unique shooting behavior: Each weapon will implement this function
-    void (*fire_func)(Vector2 origin, int direction, Bullet* bullet_array, int max_bullets);
+    // Function pointer achieving behavior polymorphism across weapon profiles
+    void (*fireFunc)(Vector2 origin, int direction, Bullet* bulletArray, int maxBullets);
 } Weapon;
 
-// Functions for the scene to handle the bullets
-void bullets_update(Bullet* bullets, int max_bullets, float dt);
-void bullets_render(Bullet* bullets, int max_bullets);
-void spawn_bullet(Bullet* bullets, int max_bullets, Vector2 pos, Vector2 vel, float radius, float lifetime, Color color);
+// Projectile system management lifecycle
+void bullets_update(Bullet* bullets, int maxBullets, float dt);
+void bullets_render(Bullet* bullets, int maxBullets);
+void spawn_bullet(Bullet* bullets, int maxBullets, Vector2 pos, Vector2 vel, float radius, float lifetime, Color color);
 
-// Default weapons generator
+// Factory function to initialize pre-configured weapon profiles
 Weapon weapon_create(WeaponType type);

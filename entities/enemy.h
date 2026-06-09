@@ -1,15 +1,17 @@
 // entities/enemy.h
 #pragma once
 
-#include <stdbool.h>
 #include <raylib.h>
+#include "player.h"
 
+// Represents a patrolling enemy entity
 typedef struct {
     Rectangle rect;
-    float vx;
-    bool dead;
+    float speedX;
+    bool isDead;
 } Enemy;
 
-Enemy enemy_init(float x, float y, float vx);
-void  enemy_update(Enemy *e, float dt);
-void  enemy_render(Enemy *e);
+// Function declarations
+Enemy enemy_init(float x, float y, float speedX);
+void enemy_update(Enemy *e, Player *p, float dt);
+void enemy_render(const Enemy *e);

@@ -1,128 +1,145 @@
-# Platformer en C + Raylib
-
-Prototipo de plataformero 2D escrito en C con raylib. El objetivo del proyecto no es solo que funcione, sino que sea modular, legible y fácil de extender.
-
----
-
-## Filosofía
-
-El proyecto sigue una arquitectura inspirada en Godot: todo ocurre dentro de **escenas**, y cada escena instancia las **entidades** que necesita. No hay lógica hardcodeada en `main.c`.
-
-- Cada escena tiene su propio loop de `update` y `render`.
-- Las entidades son structs con funciones asociadas (`init`, `update`, `render`). Sin objetos, sin magia: solo datos y funciones explícitas.
-- `main.c` inicializa la ventana, elige la escena activa y ejecuta su loop. Nada más.
-
----
-
-## Estructura
+# 2D Data-Driven Platformer
+### C + Raylib - Pure systems attempting minimal bloat
 
 ```
-Platformer/
-├── main.c                  — Entry point. Inicializa ventana y ejecuta la escena activa.
-├── scene.h                 — Define el tipo Scene (punteros a update y render).
+┌─────────────────────────────────────────────────────────┐
+│  640×480 px  │  16×12 tiles  │  40×40 px/tile  │  C99  │
+└─────────────────────────────────────────────────────────┘
+```
+
+> A modular 2D platformer built on **strict separation of concerns**.
+> Level geometry, hazard states, combat profiles and player mechanics
+> live in isolated modules the game loop just conducts.
+
+---
+
+## 📂 Project Layout
+
+```
+.
+├── assets/
+│   └── levels/
+│       └── level1.txt          # Plain-text spatial matrix
 ├── entities/
-│   ├── player.c / player.h — Struct Player, init, update, render.
-│   ├── enemy.c  / enemy.h  — Struct Enemy, init, update, render.
-│   └── box.c    / box.h    — Struct Box, init, render.
-└── scenes/
-    ├── game.c  / game.h    — Escena principal. Instancia entidades y maneja colisiones.
+│   ├── box.c / .h              # Breakable obstacles + bounce physics
+│   ├── bullet.c / .h           # Projectile pool + weapon profiles
+│   ├── enemy.c / .h            # Patrol logic + stomp/damage states
+│   └── player.c / .h           # State machine, physics, inventory
+├── scenes/
+│   └── game.c / .h             # Scene coordinator + tilemap parser
+├── scene.h                     # Scene interface (Update/Render fn ptrs)
+├── main.c                      # Entry point — window + lifecycle
+└── platformer                  # Compiled binary
 ```
 
 ---
 
-## Cómo funciona una escena
+## 🧠 Engine Philosophy
 
-`Scene` es un struct con dos punteros a funciones:
+### Data-Driven Execution
+Level maps and world objects are **never hardcoded**. The engine parses
+plain-text `.txt` matrixes at runtime. swap a file, get a new level.
 
-```c
-typedef struct {
-    void (*update)(float dt);
-    void (*render)(void);
-} Scene;
-```
+### Complete System Encapsulation
+`game.c` is a pure executive controller. `Enemy` and `Box` entities own
+their transformation loops, state flags and collision resolution
+entirely. Coordination happens through **pointer injection**, not globals.
 
-Cada escena expone una función que la inicializa y devuelve una `Scene`:
-
-```c
-Scene game_scene(void);
-```
-
-`main.c` la usa así:
+### Polymorphic Weapon Dispatch
+No `if/else` chains in the main loop. Each weapon binds a `fireFunc`
+callback that executes its own ballistic profile independently.
 
 ```c
-Scene current = game_scene();
-
-while (!WindowShouldClose()) {
-    current.update(GetFrameTime());
-    current.render();
-}
+// Weapon bound at load time — dispatched polymorphically at runtime
+weapon.fireFunc(bullets, &bulletCount, origin, direction);
 ```
-
-Para agregar una escena nueva: crear `scenes/nueva.c` y `scenes/nueva.h`, implementar `update` y `render`, y asignarla a `current` en `main.c`.
 
 ---
 
-## Cómo funciona una entidad
+## 🗺️ Tilemap Token Dictionary
 
-Cada entidad es un struct con datos propios y funciones externas que los manipulan:
-
-```c
-// Declaración (header)
-typedef struct {
-    float x, y;
-    float vy;
-    bool on_ground;
-} Player;
-
-Player player_init(float x, float y);
-void   player_update(Player *p, float dt);
-void   player_render(Player *p);
+```
+┌───────┬─────────────────────┬──────────────────────────────────────┐
+│ Token │ Entity              │ Description                          │
+├───────┼─────────────────────┼──────────────────────────────────────┤
+│   .   │ Air Space           │ Passable buffer — no physics alloc   │
+│   P   │ Player Spawn        │ Initial origin vector for the player │
+│  # =  │ Solid Geometry      │ Static platforms and boundaries      │
+│   B   │ Destructible Box    │ Stomp-bounce breakable obstacle      │
+│   E   │ Patrol Enemy        │ Active hazard — stomp-kill or damage │
+└───────┴─────────────────────┴──────────────────────────────────────┘
 ```
 
-Las funciones reciben un puntero (`*p`) para poder modificar el original. Sin puntero, C pasa una copia y los cambios se pierden.
+**Example matrix fragment:**
 
-Para agregar una entidad nueva: crear su par `.c/.h` con `init`, `update` y `render`, e incluirla en la escena que la necesite.
-
----
-
-## Física y colisiones
-
-La física es intencional y simple:
-
-- Gravedad: cada frame se suma a `vy`, que acumula velocidad hacia abajo.
-- El jugador no sabe si está en el suelo. `on_ground` se resetea a `false` al inicio de cada frame y las colisiones lo corrigen a `true` si corresponde.
-- El input de salto vive en `game_update`, después de las colisiones, para leer `on_ground` con el valor correcto.
-
-Tipos de colisión implementados:
-- Jugador con suelo (línea fija).
-- Jugador con plataformas (solo desde arriba).
-- Jugador con cajas (desde arriba, rompe la caja y rebota).
-- Jugador con enemigos (pisarlos los mata, contacto lateral resetea al jugador).
+```
+................
+###.....E....###
+........B.......
+P...............
+================
+```
 
 ---
 
-## Compilación
+## ⚔️ Weapon Profiles
+
+| Weapon        | Mechanic                                           | Input     |
+|---------------|----------------------------------------------------|-----------|
+| Semi-Auto     | Single high-speed linear shot per tap              | Press     |
+| Shotgun       | Multi-projectile burst with fixed angular spread   | Press     |
+| Full-Auto     | Continuous stream with vertical recoil simulation  | Hold      |
+| Flamethrower  | Dense short-range particle cluster with decay      | Hold      |
+
+Projectile lifecycle is managed by a centralized **bullet memory pool**
+(`MAX_BULLETS`). Allocation and deallocation never touch the heap at runtime.
+
+---
+
+## Controls
+
+```
+  ┌───┐         ┌───┐
+  │ W │  Jump   │ Q │  Swap weapon slot
+  └───┘         └───┘
+┌───┬───┐    ┌───────┐
+│ A │ D │    │ Space │  Fire active weapon
+└───┴───┘    └───────┘
+  Move
+```
+
+---
+
+## Build
+
+Compiles against any standard C toolchain linked to Raylib.
 
 ```bash
-gcc main.c scenes/game.c entities/player.c entities/enemy.c entities/box.c entities/bullet.c -o platformer -lraylib -lm
+gcc main.c scenes/game.c entities/player.c entities/enemy.c \
+    entities/box.c entities/bullet.c \
+    -o platformer -lraylib -lm
 ```
 
-Ejecutar desde la carpeta `Platformer/`.
+> **Dependencies:** [Raylib](https://www.raylib.com/) — available in most
+> package managers (`pacman -S raylib`, `apt install libraylib-dev`, etc.)
 
 ---
 
-## Dependencias
+## Memory Model
 
-- [raylib](https://www.raylib.com/) — `sudo pacman -S raylib`
-- [clang / clangd](https://clangd.llvm.org/) — LSP para el editor — `sudo pacman -S clang`
+Instance counts are tracked via live index registers at runtime:
+
+```
+platformCount   boxCount   enemyCount
+     ↓               ↓           ↓
+[ deterministic bounds — no heap growth during gameplay ]
+```
+
+All live instance arrays are **statically bounded** to maintain predictable
+memory footprints and eliminate leak vectors in long sessions.
 
 ---
 
-## Estado actual
+## 📄 License
 
-- Jugador con movimiento horizontal, salto y gravedad.
-- Plataformas con colisión.
-- Cajas destruibles.
-- Enemigo con patrulla horizontal y colisión tipo Mario.
-- Cambio de escena en runtime: pendiente.# Platformer
- 
+See [`LICENSE`](./LICENSE).

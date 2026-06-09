@@ -1,64 +1,62 @@
-// ==========================================
-// FILE: entities/bullet.c
-// ==========================================
+// entities/bullet.c
 #include "bullet.h"
-#include <math.h>
 
-// --- Utilidad para buscar un slot libre en el array de la escena ---
-void spawn_bullet(Bullet* bullets, int max_bullets, Vector2 pos, Vector2 vel, float radius, float lifetime, Color color) {
-    for (int i = 0; i < max_bullets; i++) {
-        if (!bullets[i].active) {
+// Loops through the pre-allocated pool to find and initialize an inactive bullet slot
+void spawn_bullet(Bullet* bullets, int maxBullets, Vector2 pos, Vector2 vel, float radius, float lifetime, Color color) {
+    for (int i = 0; i < maxBullets; i++) {
+        if (!bullets[i].isActive) {
             bullets[i].position = pos;
             bullets[i].velocity = vel;
             bullets[i].radius = radius;
             bullets[i].color = color;
             bullets[i].lifetime = lifetime;
-            bullets[i].active = true;
+            bullets[i].isActive = true; // Allocate slot
             return;
         }
     }
 }
 
 // =================================================================
-// SHOOTING BEHAVIORS
+// WEAPON BEHAVIOR IMPLEMENTATIONS (Polymorphic Fire Functions)
 // =================================================================
 
+// High-speed, high-precision straight single shot
 static void fire_semiauto(Vector2 origin, int dir, Bullet* bullets, int max) {
-    Vector2 vel = { dir * 600.0f, 0.0f }; // Rápida y recta
+    Vector2 vel = { dir * 600.0f, 0.0f };
     spawn_bullet(bullets, max, origin, vel, 4.0f, 2.0f, YELLOW);
 }
 
+// Continuous fire stream with a minor vertical recoil simulation
 static void fire_fullauto(Vector2 origin, int dir, Bullet* bullets, int max) {
-    // Simmilar to Semiauto, but whith a slight imperfection in the Y axis
-    float random_y_spread = (float)GetRandomValue(-30, 30);
-    Vector2 vel = { dir * 550.0f, random_y_spread };
+    float randomYSpread = (float)GetRandomValue(-30, 30);
+    Vector2 vel = { dir * 550.0f, randomYSpread };
     spawn_bullet(bullets, max, origin, vel, 4.0f, 1.5f, ORANGE);
 }
 
+// Multi-projectile spread pattern casting 3 distinct angular vectors
 static void fire_shotgun(Vector2 origin, int dir, Bullet* bullets, int max) {
-    // Shoots 3 spread bullets
-    float base_speed = 500.0f;
+    float baseSpeed = 500.0f;
 
-    // Straight bullet
-    spawn_bullet(bullets, max, origin, (Vector2){ dir * base_speed, 0.0f }, 4.0f, 0.5f, GOLD);
-    // Upwards-angled bullet
-    spawn_bullet(bullets, max, origin, (Vector2){ dir * base_speed, -150.0f }, 4.0f, 0.5f, GOLD);
-    // Downwards angled bullet
-    spawn_bullet(bullets, max, origin, (Vector2){ dir * base_speed, 150.0f }, 4.0f, 0.5f, GOLD);
+    // Center straight projectile
+    spawn_bullet(bullets, max, origin, (Vector2){ dir * baseSpeed, 0.0f }, 4.0f, 0.5f, GOLD);
+    // Upward angled projectile
+    spawn_bullet(bullets, max, origin, (Vector2){ dir * baseSpeed, -150.0f }, 4.0f, 0.5f, GOLD);
+    // Downward angled projectile
+    spawn_bullet(bullets, max, origin, (Vector2){ dir * baseSpeed, 150.0f }, 4.0f, 0.5f, GOLD);
 }
 
+// High-density, short-range particle simulation with randomized scale outputs
 static void fire_flamethrower(Vector2 origin, int dir, Bullet* bullets, int max) {
-    // Flamethrower, slow bursts with a lot of spread that die quickly.
-    float speed_x = dir * (float)GetRandomValue(200, 300);
-    float speed_y = (float)GetRandomValue(-80, 80);
-    float size = (float)GetRandomValue(6, 12); // Fire is bigger than bullets
+    float speedX = dir * (float)GetRandomValue(200, 300);
+    float speedY = (float)GetRandomValue(-80, 80);
+    float randomSize = (float)GetRandomValue(6, 12);
 
-    spawn_bullet(bullets, max, origin, (Vector2){ speed_x, speed_y }, size, 0.4f, RED);
+    spawn_bullet(bullets, max, origin, (Vector2){ speedX, speedY }, randomSize, 0.4f, RED);
 }
 
 // =================================================================
 
-// Weapons
+// Weapon Blueprint Factory: Sets attributes and assigns correct function bindings
 Weapon weapon_create(WeaponType type) {
     Weapon w;
     w.type = type;
@@ -66,52 +64,61 @@ Weapon weapon_create(WeaponType type) {
 
     switch (type) {
         case WEAPON_SEMIAUTO:
-            w.name = "Semiauto";
-            w.fire_rate = 0.25f;
-            w.is_automatic = false;
-            w.fire_func = fire_semiauto;
+            w.name = "Semi-Auto";
+            w.fireRate = 0.25f;
+            w.isAutomatic = false;
+            w.fireFunc = fire_semiauto;
             break;
         case WEAPON_SHOTGUN:
             w.name = "Shotgun";
-            w.fire_rate = 0.6f;
-            w.is_automatic = false;
-            w.fire_func = fire_shotgun;
+            w.fireRate = 0.6f;
+            w.isAutomatic = false;
+            w.fireFunc = fire_shotgun;
             break;
         case WEAPON_FULLAUTO:
             w.name = "Full-Auto";
-            w.fire_rate = 0.1f;
-            w.is_automatic = true;
-            w.fire_func = fire_fullauto;
+            w.fireRate = 0.1f;
+            w.isAutomatic = true;
+            w.fireFunc = fire_fullauto;
             break;
         case WEAPON_FLAMETHROWER:
-            w.name = "Lanzallamas";
-            w.fire_rate = 0.05f; // Muy rápido por ser partículas de fuego
-            w.is_automatic = true;
-            w.fire_func = fire_flamethrower;
+            w.name = "Flamethrower";
+            w.fireRate = 0.05f;
+            w.isAutomatic = true;
+            w.fireFunc = fire_flamethrower;
+            break;
+        default:
+            // Fallback default case to silence compiler warnings for meta-values like WEAPON_COUNT
+            w.name = "Unknown";
+            w.fireRate = 1.0f;
+            w.isAutomatic = false;
+            w.fireFunc = fire_semiauto;
             break;
     }
     return w;
 }
 
-// Update bullets in the air
-void bullets_update(Bullet* bullets, int max_bullets, float dt) {
-    for (int i = 0; i < max_bullets; i++) {
-        if (!bullets[i].active) continue;
+// Updates physical translations and handles decay tracking for active projectiles
+void bullets_update(Bullet* bullets, int maxBullets, float dt) {
+    for (int i = 0; i < maxBullets; i++) {
+        if (!bullets[i].isActive) continue;
 
+        // Linear translation resolution
         bullets[i].position.x += bullets[i].velocity.x * dt;
         bullets[i].position.y += bullets[i].velocity.y * dt;
-        bullets[i].lifetime -= dt;
 
-        if (bullets[i].lifetime <= 0) {
-            bullets[i].active = false;
+        // Decay timer evaluation
+        bullets[i].lifetime -= dt;
+        if (bullets[i].lifetime <= 0.0f) {
+            bullets[i].isActive = false; // Deallocate slot for reuse
         }
     }
 }
 
-// Draw the bullets
-void bullets_render(Bullet* bullets, int max_bullets) {
-    for (int i = 0; i < max_bullets; i++) {
-        if (bullets[i].active) {
+// Iterates through active slots to render circle primitives
+void bullets_render(Bullet* bullets, int maxBullets) {
+    for (int i = 0; i < maxBullets; i++) {
+        if (bullets[i].isActive) {
             DrawCircleV(bullets[i].position, bullets[i].radius, bullets[i].color);
         }
     }

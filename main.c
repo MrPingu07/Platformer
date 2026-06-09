@@ -4,16 +4,25 @@
 #include "scenes/game.h"
 
 int main(void) {
-    InitWindow(640, 480, "Platformer");
+    // Window configuration
+    const int screenWidth = 640;
+    const int screenHeight = 480;
+    InitWindow(screenWidth, screenHeight, "Prototype");
     SetTargetFPS(60);
 
-    Scene current = game_scene();
+    // Initialize the starting scene (Game Scene)
+    Scene currentScene = game_scene();
 
+    // Main Game Loop
     while (!WindowShouldClose()) {
-        current.update(GetFrameTime());
-        current.render();
+        // 1. Update scene logic passing Delta Time
+        currentScene.update(GetFrameTime());
+
+        // 2. Render the scene
+        currentScene.render();
     }
 
+    // De-virtualization and cleanup
     CloseWindow();
     return 0;
 }
