@@ -2,12 +2,13 @@
 #include "bullet.h"
 
 // Loops through the pre-allocated pool to find and initialize an inactive bullet slot
-void spawn_bullet(Bullet* bullets, int maxBullets, Vector2 pos, Vector2 vel, float radius, float lifetime, Color color) {
+void spawn_bullet(Bullet* bullets, int maxBullets, Vector2 pos, Vector2 vel, float radius, float damage, float lifetime, Color color) {
     for (int i = 0; i < maxBullets; i++) {
         if (!bullets[i].isActive) {
             bullets[i].position = pos;
             bullets[i].velocity = vel;
             bullets[i].radius = radius;
+            bullets[i].damage = damage;
             bullets[i].color = color;
             bullets[i].lifetime = lifetime;
             bullets[i].isActive = true; // Allocate slot
@@ -20,38 +21,51 @@ void spawn_bullet(Bullet* bullets, int maxBullets, Vector2 pos, Vector2 vel, flo
 // WEAPON BEHAVIOR IMPLEMENTATIONS (Polymorphic Fire Functions)
 // =================================================================
 
-// High-speed, high-precision straight single shot
-static void fire_semiauto(Vector2 origin, int dir, Bullet* bullets, int max) {
-    Vector2 vel = { dir * 600.0f, 0.0f };
-    spawn_bullet(bullets, max, origin, vel, 4.0f, 2.0f, YELLOW);
+// Semiauto. High-speed, high-precision straight single shot
+static void fire_semiauto(Vector2 origin, Vector2 aimDir, Bullet* bullets, int max) {
+    Vector2 vel = { aimDir.x * 600.0f, aimDir.y * 600.0f };
+    spawn_bullet(bullets, max, origin, vel, 4.0f, 34.0f, 2.0f, YELLOW);
 }
 
-// Continuous fire stream with a minor vertical recoil simulation
-static void fire_fullauto(Vector2 origin, int dir, Bullet* bullets, int max) {
-    float randomYSpread = (float)GetRandomValue(-30, 30);
-    Vector2 vel = { dir * 550.0f, randomYSpread };
-    spawn_bullet(bullets, max, origin, vel, 4.0f, 1.5f, ORANGE);
+// Full Auto. Continuous fire stream with a minor vertical recoil simulation
+static void fire_fullauto(Vector2 origin, Vector2 aimDir, Bullet* bullets, int max) {
+    // Recoil in an axis perpendicular to shooting direction
+    float spread = (float)GetRandomValue(-30, 30);
+    Vector2 vel = {
+        aimDir.x * 550.0f + (aimDir.y != 0.0f ? spread : 0.0f),
+        aimDir.y * 550.0f + (aimDir.x != 0.0f ? spread : 0.0f)
+    };
+    spawn_bullet(bullets, max, origin, vel, 4.0f, 10.0f, 1.5f, ORANGE);
 }
 
-// Multi-projectile spread pattern casting 3 distinct angular vectors
-static void fire_shotgun(Vector2 origin, int dir, Bullet* bullets, int max) {
+// Shotgun. Multi-projectile spread pattern casting 5 distinct angular vectors
+static void fire_shotgun(Vector2 origin, Vector2 aimDir, Bullet* bullets, int max) {
     float baseSpeed = 500.0f;
 
-    // Center straight projectile
-    spawn_bullet(bullets, max, origin, (Vector2){ dir * baseSpeed, 0.0f }, 4.0f, 0.5f, GOLD);
-    // Upward angled projectile
-    spawn_bullet(bullets, max, origin, (Vector2){ dir * baseSpeed, -150.0f }, 4.0f, 0.5f, GOLD);
-    // Downward angled projectile
-    spawn_bullet(bullets, max, origin, (Vector2){ dir * baseSpeed, 150.0f }, 4.0f, 0.5f, GOLD);
+    // Perpendicular vector for spread
+    Vector2 perp = { -aimDir.y, aimDir.x };
+
+    float spreads[5] = { 0.0f, -0.3f, 0.3f, -0.15f, 0.15f };
+    for (int i = 0; i < 5; i++) {
+        Vector2 vel = {
+            (aimDir.x + perp.x * spreads[i]) * baseSpeed,
+            (aimDir.y + perp.y * spreads[i]) * baseSpeed
+        };
+        spawn_bullet(bullets, max, origin, vel, 4.0f, 15.0f, 0.5f, GOLD);
+    }
 }
 
-// High-density, short-range particle simulation with randomized scale outputs
-static void fire_flamethrower(Vector2 origin, int dir, Bullet* bullets, int max) {
-    float speedX = dir * (float)GetRandomValue(200, 300);
-    float speedY = (float)GetRandomValue(-80, 80);
+// Flamethrower. High-density, short-range particle simulation with randomized scale outputs
+static void fire_flamethrower(Vector2 origin, Vector2 aimDir, Bullet* bullets, int max) {
+    float speed  = (float)GetRandomValue(200, 300);
+    float spread = (float)GetRandomValue(-80, 80);
+    Vector2 perp = { -aimDir.y, aimDir.x };
+    Vector2 vel  = {
+        aimDir.x * speed + perp.x * spread,
+        aimDir.y * speed + perp.y * spread
+    };
     float randomSize = (float)GetRandomValue(6, 12);
-
-    spawn_bullet(bullets, max, origin, (Vector2){ speedX, speedY }, randomSize, 0.4f, RED);
+    spawn_bullet(bullets, max, origin, vel, randomSize, 5.0f, 0.8f, RED);
 }
 
 // =================================================================

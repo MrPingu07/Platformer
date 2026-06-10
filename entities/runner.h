@@ -1,6 +1,5 @@
 // entities/enemy.h
 #pragma once
-
 #include <raylib.h>
 #include "player.h"
 
@@ -8,10 +7,12 @@
 typedef struct {
     Rectangle rect;
     float speedX;
+    float vy;
+    float health;
     bool isDead;
-} Enemy;
+} Runner;
 
 // Function declarations
-Enemy enemy_init(float x, float y, float speedX);
-void enemy_update(Enemy *e, Player *p, float dt);
-void enemy_render(const Enemy *e);
+Runner runner_init(float x, float y, float speedX);
+void   runner_update(Runner *r, Player *p, float dt);
+void   runner_render(const Runner *r);

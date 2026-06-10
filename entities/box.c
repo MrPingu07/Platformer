@@ -23,7 +23,7 @@ void box_update(Box *b, Player *p) {
 
         if (isStomping) {
             p->y = b->rect.y - 40.0f;          // Snap player to the top of the box to prevent sinking
-            p->vy = -400.0f / 1.5f;             // Apply a scaled upward jump force bounce execution
+            p->vy = -350.0f;             // Apply a scaled upward jump force bounce execution
             p->onGround = true;
             b->isBroken = true;                 // Trigger destruction state
         }

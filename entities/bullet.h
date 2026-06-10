@@ -11,6 +11,7 @@ typedef struct {
     Vector2 position;
     Vector2 velocity;
     float radius;
+    float damage;
     Color color;
     float lifetime; // Time-to-live tracker (seconds) before auto-deactivation
     bool isActive;  // Flag to manage memory pool allocation
@@ -34,13 +35,13 @@ typedef struct Weapon {
     bool isAutomatic;   // Triggers input check type (Hold vs. Press)
 
     // Function pointer achieving behavior polymorphism across weapon profiles
-    void (*fireFunc)(Vector2 origin, int direction, Bullet* bulletArray, int maxBullets);
+    void (*fireFunc)(Vector2 origin, Vector2 aimDir, Bullet* bulletArray, int maxBullets);
 } Weapon;
 
 // Projectile system management lifecycle
 void bullets_update(Bullet* bullets, int maxBullets, float dt);
 void bullets_render(Bullet* bullets, int maxBullets);
-void spawn_bullet(Bullet* bullets, int maxBullets, Vector2 pos, Vector2 vel, float radius, float lifetime, Color color);
+void spawn_bullet(Bullet* bullets, int maxBullets, Vector2 pos, Vector2 vel, float radius, float damage, float lifetime, Color color);
 
 // Factory function to initialize pre-configured weapon profiles
 Weapon weapon_create(WeaponType type);

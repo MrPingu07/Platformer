@@ -11,6 +11,10 @@ typedef struct {
     bool onGround;       // Flag to check if the player is touching a platform
     int facing;          // Look direction: 1 for Right, -1 for Left
 
+    // Aiming & crouch state
+    Vector2 aimDir;   // Normalized direction vector for current aim
+    bool isCrouching;
+
     // Combat & Inventory system
     Weapon inventory[2]; // Two available weapon slots
     int currentSlot;     // Index of the currently equipped weapon (0 or 1)

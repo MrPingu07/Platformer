@@ -1,7 +1,7 @@
 // scenes/game.c
 #include "game.h"
 #include "../entities/player.h"
-#include "../entities/enemy.h"
+#include "../entities/runner.h"
 #include "../entities/box.h"
 #include "../entities/bullet.h"
 #include <raylib.h>
@@ -18,8 +18,8 @@
 
 // --- Scene State (Private Module Storage) ---
 static Player    player;
-static Enemy     enemies[255];
-static int       enemyCount;
+static Runner     runners[255];
+static int       runnerCount;
 static Box       boxes[255];
 static int       boxCount;
 static Rectangle platforms[255]; // Increased capacity for tilemap layouts
@@ -83,9 +83,9 @@ static void load_level(const char* filename) {
                 break;
 
             case 'E': // Active Patrolling Hazard Entity
-                if (enemyCount < 255) {
-                    enemies[enemyCount] = enemy_init(posX, posY, 100.0f);
-                    enemyCount++;
+                if (runnerCount < 255) {
+                    runners[runnerCount] = runner_init(posX, posY, 100.0f);
+                    runnerCount++;
                 }
                 break;
 
@@ -114,7 +114,7 @@ static void game_init(void) {
     // Reset all entity counters before loading
     platformCount = 0;
     boxCount = 0;
-    enemyCount = 0;
+    runnerCount = 0;
 
     // Reset projectile pool
     for (int i = 0; i < MAX_BULLETS; i++) {
@@ -127,67 +127,98 @@ static void game_init(void) {
 
 // Internal helper to handle player interaction with static level geometry (platforms/floor)
 static void resolve_environment_collisions(Player *p, Rectangle *worldPlatforms, int count) {
+    float playerH = p->isCrouching ? 20.0f : 40.0f;  // TODO: INSERTAR AQUÍ
+    float playerW = p->isCrouching ? 50.0f : 40.0f;
+    float offsetX = p->isCrouching ? -5.0f : 0.0f;
+
     for (int i = 0; i < count; i++) {
-        // Only check for landing if the player is moving downwards (vy >= 0)
+        Rectangle playerRect = { p->x + offsetX, p->y + (40.0f - playerH), playerW, playerH };
         if (p->vy >= 0.0f &&
-            CheckCollisionRecs((Rectangle){p->x, p->y, 40, 40}, worldPlatforms[i]) &&
-            (p->y + 40 <= worldPlatforms[i].y + 10))
+            CheckCollisionRecs(playerRect, worldPlatforms[i]) &&
+            (playerRect.y + playerH <= worldPlatforms[i].y + 10))
         {
-            p->y = worldPlatforms[i].y - 40; // Snap to surface
-            p->vy = 0;                       // Stop vertical momentum
-            p->onGround = true;              // Reset jump ability
+            p->y = worldPlatforms[i].y - playerH - (40.0f - playerH); // Keeps p-> anchored to ground
+            p->vy = 0;
+            p->onGround = true;
         }
     }
 }
+
+static void resolve_rect_collision(Rectangle *rect, float *vy, Rectangle *worldPlatforms, int count) {
+    for (int i = 0; i < count; i++) {
+        if (*vy >= 0.0f &&
+            CheckCollisionRecs(*rect, worldPlatforms[i]) &&
+            (rect->y + rect->height <= worldPlatforms[i].y + 10.0f))
+        {
+            rect->y = worldPlatforms[i].y - rect->height;
+            *vy = 0.0f;
+        }
+    }
+}
+
+static void resolve_bullet_runner_collisions(void) {
+    for (int i = 0; i < runnerCount; i++) {
+        if (runners[i].isDead) continue;
+        for (int j = 0; j < MAX_BULLETS; j++) {
+            if (!gameBullets[j].isActive) continue;
+            if (CheckCollisionCircleRec(gameBullets[j].position, gameBullets[j].radius, runners[i].rect)) {
+                runners[i].health -= gameBullets[j].damage;
+                gameBullets[j].isActive = false;
+                if (runners[i].health <= 0.0f)
+                    runners[i].isDead = true;
+            }
+        }
+    }
+}
+
 // --- Scene Lifecycle: Update ---
 static void game_update(float dt) {
-    // 1. Reset state for the new frame
     player.onGround = false;
 
-    // 2. Core Entity Updates
     player_update(&player, dt);
+    resolve_environment_collisions(&player, platforms, platformCount);
+    player.isCrouching = IsKeyDown(KEY_S) && player.onGround;
     player_handle_combat(&player, gameBullets, MAX_BULLETS, dt);
     bullets_update(gameBullets, MAX_BULLETS, dt);
 
-    // 3. Encapsulated Collision/Logic Passes
-    // Each system is now responsible for its own interactions
-    for (int i = 0; i < enemyCount; i++) enemy_update(&enemies[i], &player, dt);
-    for (int i = 0; i < boxCount; i++)   box_update(&boxes[i], &player);
+    for (int i = 0; i < runnerCount; i++) {
+        runner_update(&runners[i], &player, dt);
+        resolve_rect_collision(&runners[i].rect, &runners[i].vy, platforms, platformCount);
+    }
+    for (int i = 0; i < boxCount; i++) box_update(&boxes[i], &player);
 
-    // 4. Static Environment Resolution
-    resolve_environment_collisions(&player, platforms, platformCount);
-
-    // 5. Input Post-Processing
-    if (IsKeyPressed(KEY_W) && player.onGround) {
-        player.vy = -400.0f; // JUMP_FORCE
+    if (IsKeyPressed(KEY_W) && player.onGround && !player.isCrouching) {
+        player.vy = -400.0f;
         player.onGround = false;
     }
+
+    resolve_bullet_runner_collisions();
 }
 
 // --- Scene Lifecycle: Render ---
 static void game_render(void) {
     BeginDrawing();
     ClearBackground(DARKGRAY);
-
+    //Render platforms
     for (int i = 0; i < platformCount; i++) DrawRectangleRec(platforms[i], GRAY);
-
+    //Render Boxes
     for (int i = 0; i < boxCount; i++) {
         // Each box handles its own state updates and player interaction checks
         box_render(&boxes[i]);
     }
-
-    for (int i = 0; i < enemyCount; i++) {
-        enemy_render(&enemies[i]);
-    }
-
+    //Render bullets
     bullets_render(gameBullets, MAX_BULLETS);
+    //Render Runner
+    for (int i = 0; i < runnerCount; i++) {
+        runner_render(&runners[i]);
+    }
+    //Render Pla
     player_render(&player);
 
     // UI Overlay
     Weapon currentWeapon = player.inventory[player.currentSlot];
     DrawText(TextFormat("WEAPON: %s", currentWeapon.name), 20, 20, 20, RAYWHITE);
     DrawText("A/D: Move  W: Jump  SPACE: Fire  Q: Swap", 20, 450, 10, LIGHTGRAY);
-
     EndDrawing();
 }
 
