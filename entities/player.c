@@ -5,6 +5,7 @@
 
 #define GRAVITY     800.0f
 #define MOVE_SPEED  300.0f
+#define ACCELERATION 1800.0f
 #define JUMP_FORCE  -400.0f
 
 Player player_init(float x, float y) {
@@ -66,19 +67,8 @@ void player_handle_combat(Player *p, Bullet *bullets, int maxBullets, float dt) 
 // Apply gravity accumulation and integrate vertical position
 void player_update(Player *p, float dt) {
     p->vy += GRAVITY * dt;
-    p->y  += p->vy * dt;
-
-    // Halve movement speed while crouching
-    float speed = p->isCrouching ? MOVE_SPEED * 0.5f : MOVE_SPEED;
-
-    // Lock horizontal axis when aiming up on ground with no horizontal input
-    bool lockX = IsKeyDown(KEY_W) && p->onGround &&
-    !IsKeyDown(KEY_A) && !IsKeyDown(KEY_D);
-
-    if (!lockX) {
-        if (IsKeyDown(KEY_D)) { p->x += speed * dt; p->facing =  1; }
-        if (IsKeyDown(KEY_A)) { p->x -= speed * dt; p->facing = -1; }
-    }
+    if (p->vy > 500.0f) p->vy = 500.0f;
+    p->y += p->vy * dt;
 }
 
 void player_render(Player *p) {

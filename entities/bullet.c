@@ -57,8 +57,8 @@ static void fire_shotgun(Vector2 origin, Vector2 aimDir, Bullet* bullets, int ma
 
 // Flamethrower. High-density, short-range particle simulation with randomized scale outputs
 static void fire_flamethrower(Vector2 origin, Vector2 aimDir, Bullet* bullets, int max) {
-    float speed  = (float)GetRandomValue(200, 300);
-    float spread = (float)GetRandomValue(-80, 80);
+    float speed  = (float)GetRandomValue(400, 500);
+    float spread = (float)GetRandomValue(-100, 100);
     Vector2 perp = { -aimDir.y, aimDir.x };
     Vector2 vel  = {
         aimDir.x * speed + perp.x * spread,

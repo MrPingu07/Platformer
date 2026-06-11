@@ -4,10 +4,17 @@
 #include <raylib.h>
 #include "bullet.h" // Required for the Weapon type and inventory
 
+#define MOVE_SPEED       300.0f
+#define ACCELERATION     1800.0f
+#define AIR_ACCELERATION 400.0f
+#define FRICTION         1400.0f
+#define AIR_FRICTION     300.0f
+
 // Player entity with physics, state, and inventory management
 typedef struct {
     float x, y;          // Position in world space
     float vy;            // Vertical velocity (for gravity and jumping)
+    float vx;            // Horizontal velocity (player features momentum)
     bool onGround;       // Flag to check if the player is touching a platform
     int facing;          // Look direction: 1 for Right, -1 for Left
 

@@ -4,25 +4,30 @@
 #include "../entities/runner.h"
 #include "../entities/box.h"
 #include "../entities/bullet.h"
+#include "../entities/collision.h"
+#include "../entities/hittable.h"
 #include <raylib.h>
 #include <stdio.h>  // Required for file handling (fopen, fgetc, fclose)
 
 // Scene and Grid Constants
 #define TILE_SIZE       40.0f
-#define GRID_COLS       16
-#define GRID_ROWS       12
 #define FLOOR_Y         440.0f
 #define SCREEN_WIDTH    640
 #define PLAYER_SIZE     40
 #define JUMP_FORCE      -400.0f
 
 // --- Scene State (Private Module Storage) ---
+static int       GRID_COLS = 0;
+static int       GRID_ROWS = 0;
+static int       levelWidth  = 0;
+static int       levelHeight = 0;
+static Camera2D  camera = { 0 };
 static Player    player;
-static Runner     runners[255];
+static Runner    runners[255];
 static int       runnerCount;
 static Box       boxes[255];
 static int       boxCount;
-static Rectangle platforms[255]; // Increased capacity for tilemap layouts
+static Rectangle platforms[255];
 static int       platformCount;
 static Bullet    gameBullets[MAX_BULLETS];
 
@@ -31,13 +36,50 @@ static Bullet    gameBullets[MAX_BULLETS];
 // Reads an external text asset file and populates the entity arrays based on grid coordinates.
 // This implementation uses a continuous stream filter to guarantee that hidden carriage returns
 // (\r) and newlines (\n) do not cause column-alignment offsets.
+
+static void measure_level(const char *filename) {
+    FILE *f = fopen(filename, "r");
+    if (!f) return;
+
+    int cols = 0, maxCols = 0, rows = 0;
+    int ch;
+    while ((ch = fgetc(f)) != EOF) {
+        if (ch == '\r') continue;
+        if (ch == '\n') {
+            if (cols > 0) {           // ignora líneas vacías
+                if (cols > maxCols) maxCols = cols;
+                rows++;
+            }
+            cols = 0;
+        } else {
+            cols++;
+        }
+    }
+    // Última línea sin newline final
+    if (cols > 0) {
+        if (cols > maxCols) maxCols = cols;
+        rows++;
+    }
+
+    fclose(f);
+    GRID_COLS   = maxCols;
+    GRID_ROWS   = rows;
+    levelWidth  = maxCols * (int)TILE_SIZE;   // TODO: INSERTAR AQUÍ
+    levelHeight = rows    * (int)TILE_SIZE;
+}
+
 static void load_level(const char* filename) {
+    bool playerSpawned = false;
     FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        player = player_init(0, 0);
+        return;
+    }
 
     // Safety Fallback: If the level file is missing or corrupted,
     // prevent a crash and spawn the player at default safe coordinates.
     if (file == NULL) {
-        player = player_init(100, 300);
+        player = player_init(0, 0);
         return;
     }
 
@@ -63,8 +105,9 @@ static void load_level(const char* filename) {
 
         // Tile Interpreter Matrix
         switch (ch) {
-            case 'P': // Player Start Token
+            case 'P':
                 player = player_init(posX, posY);
+                playerSpawned = true;
                 break;
 
             case '#': // Static Level Architecture Component
@@ -105,6 +148,10 @@ static void load_level(const char* filename) {
         }
     }
 
+    // Fallback: si no se encontró P en el nivel, spawn en posición segura
+    if (!playerSpawned)
+        player = player_init(0.0f, 0.0f);
+
     // Explicitly release the OS file descriptor handle to avoid memory leaks
     fclose(file);
 }
@@ -122,69 +169,63 @@ static void game_init(void) {
     }
 
     // Load level data from external text file
+    measure_level(TextFormat("assets/levels/%s", "level1.txt"));
     load_level(TextFormat("assets/levels/%s", "level1.txt"));
-}
 
-// Internal helper to handle player interaction with static level geometry (platforms/floor)
-static void resolve_environment_collisions(Player *p, Rectangle *worldPlatforms, int count) {
-    float playerH = p->isCrouching ? 20.0f : 40.0f;  // TODO: INSERTAR AQUÍ
-    float playerW = p->isCrouching ? 50.0f : 40.0f;
-    float offsetX = p->isCrouching ? -5.0f : 0.0f;
-
-    for (int i = 0; i < count; i++) {
-        Rectangle playerRect = { p->x + offsetX, p->y + (40.0f - playerH), playerW, playerH };
-        if (p->vy >= 0.0f &&
-            CheckCollisionRecs(playerRect, worldPlatforms[i]) &&
-            (playerRect.y + playerH <= worldPlatforms[i].y + 10))
-        {
-            p->y = worldPlatforms[i].y - playerH - (40.0f - playerH); // Keeps p-> anchored to ground
-            p->vy = 0;
-            p->onGround = true;
-        }
-    }
-}
-
-static void resolve_rect_collision(Rectangle *rect, float *vy, Rectangle *worldPlatforms, int count) {
-    for (int i = 0; i < count; i++) {
-        if (*vy >= 0.0f &&
-            CheckCollisionRecs(*rect, worldPlatforms[i]) &&
-            (rect->y + rect->height <= worldPlatforms[i].y + 10.0f))
-        {
-            rect->y = worldPlatforms[i].y - rect->height;
-            *vy = 0.0f;
-        }
-    }
-}
-
-static void resolve_bullet_runner_collisions(void) {
-    for (int i = 0; i < runnerCount; i++) {
-        if (runners[i].isDead) continue;
-        for (int j = 0; j < MAX_BULLETS; j++) {
-            if (!gameBullets[j].isActive) continue;
-            if (CheckCollisionCircleRec(gameBullets[j].position, gameBullets[j].radius, runners[i].rect)) {
-                runners[i].health -= gameBullets[j].damage;
-                gameBullets[j].isActive = false;
-                if (runners[i].health <= 0.0f)
-                    runners[i].isDead = true;
-            }
-        }
-    }
+    camera.target   = (Vector2){ player.x + 20.0f, player.y + 20.0f };
+    camera.offset   = (Vector2){ 640.0f / 2.0f, 480.0f / 2.0f };
+    camera.rotation = 0.0f;
+    camera.zoom     = 1.0f;
 }
 
 // --- Scene Lifecycle: Update ---
 static void game_update(float dt) {
     player.onGround = false;
-
     player_update(&player, dt);
     resolve_environment_collisions(&player, platforms, platformCount);
+
+    // Horizontal movement
+    float speed = player.isCrouching ? MOVE_SPEED * 0.5f : MOVE_SPEED;
+    bool lockX = IsKeyDown(KEY_W) && player.onGround &&
+    !IsKeyDown(KEY_A) && !IsKeyDown(KEY_D);
+
+    if (!lockX) {
+        float accel = player.onGround ? ACCELERATION : AIR_ACCELERATION;
+
+        if (IsKeyDown(KEY_D)) { player.vx += accel * dt; player.facing =  1; }
+        else if (IsKeyDown(KEY_A)) { player.vx -= accel * dt; player.facing = -1; }
+
+        if (player.vx >  speed) player.vx =  speed;
+        if (player.vx < -speed) player.vx = -speed;
+
+        player.x += player.vx * dt;
+
+        if (player.x < 0.0f) { player.x = 0.0f; player.vx = 0.0f; }
+        if (player.x + 40.0f > levelWidth) { player.x = levelWidth - 40.0f; player.vx = 0.0f; }
+    }
+
+    // Friction
+    if (!IsKeyDown(KEY_A) && !IsKeyDown(KEY_D)) {
+        float friction = player.onGround ? FRICTION : AIR_FRICTION;
+        if (player.vx > 0.0f) { player.vx -= friction * dt; if (player.vx < 0.0f) player.vx = 0.0f; }
+        if (player.vx < 0.0f) { player.vx += friction * dt; if (player.vx > 0.0f) player.vx = 0.0f; }
+    }
+
+    // Crouch state
     player.isCrouching = IsKeyDown(KEY_S) && player.onGround;
     player_handle_combat(&player, gameBullets, MAX_BULLETS, dt);
     bullets_update(gameBullets, MAX_BULLETS, dt);
 
     for (int i = 0; i < runnerCount; i++) {
-        runner_update(&runners[i], &player, dt);
-        resolve_rect_collision(&runners[i].rect, &runners[i].vy, platforms, platformCount);
+        runner_update(&runners[i], &player, dt, (float)levelWidth, platforms, platformCount);
+        runners[i].onGround = false;
+        resolve_rect_collision(&runners[i].rect, &runners[i].vy, platforms, platformCount, &runners[i].onGround);
+        for (int j = 0; j < boxCount; j++) {
+            if (boxes[j].isBroken) continue;
+            resolve_rect_collision(&runners[i].rect, &runners[i].vy, &boxes[j].rect, 1, &runners[i].onGround);
+        }
     }
+
     for (int i = 0; i < boxCount; i++) box_update(&boxes[i], &player);
 
     if (IsKeyPressed(KEY_W) && player.onGround && !player.isCrouching) {
@@ -192,12 +233,64 @@ static void game_update(float dt) {
         player.onGround = false;
     }
 
-    resolve_bullet_runner_collisions();
+    // Deadzone: middle third of the screen
+    float playerScreenX = (player.x + 20.0f) - camera.target.x + camera.offset.x;
+
+    float deadzoneLeft  = 280.0f;
+    float deadzoneRight = 310.0f;
+
+    float targetX = camera.target.x;
+
+    if (playerScreenX < deadzoneLeft)
+        targetX += (playerScreenX - deadzoneLeft);
+    if (playerScreenX > deadzoneRight)
+        targetX += (playerScreenX - deadzoneRight);
+
+    camera.target.x += (targetX - camera.target.x) * 6.0f * dt;
+
+    // Lerp vertical
+    float playerScreenY = (player.y + 20.0f) - camera.target.y + camera.offset.y;
+
+    float deadzoneTop    = 180.0f;
+    float deadzoneBottom = 300.0f;
+
+    float targetY = camera.target.y;
+
+    if (playerScreenY < deadzoneTop)
+        targetY += (playerScreenY - deadzoneTop);
+    if (playerScreenY > deadzoneBottom)
+        targetY += (playerScreenY - deadzoneBottom);
+
+    camera.target.y += (targetY - camera.target.y) * 6.0f * dt;
+
+    // Clamp to level borders
+    float halfW = 640.0f / 2.0f;
+    float halfH = 480.0f / 2.0f;
+
+    if (camera.target.x < halfW)                camera.target.x = halfW;
+    if (camera.target.x > levelWidth  - halfW)  camera.target.x = levelWidth  - halfW;
+    if (camera.target.y < halfH)                camera.target.y = halfH;
+    if (camera.target.y > levelHeight - halfH)  camera.target.y = levelHeight - halfH;
+
+    Hittable targets[255];
+    int targetCount = 0;
+    for (int i = 0; i < runnerCount; i++) {
+        targets[targetCount++] = (Hittable){
+            .rect    = &runners[i].rect,
+            .health  = &runners[i].health,
+            .isDead  = &runners[i].isDead
+        };
+    }
+    resolve_bullet_hittable_collisions(targets, targetCount, gameBullets, MAX_BULLETS);
+
+    if (player.y > levelHeight + 200.0f) game_init();
+
 }
 
 // --- Scene Lifecycle: Render ---
 static void game_render(void) {
     BeginDrawing();
+    BeginMode2D(camera);
     ClearBackground(DARKGRAY);
     //Render platforms
     for (int i = 0; i < platformCount; i++) DrawRectangleRec(platforms[i], GRAY);
@@ -212,9 +305,9 @@ static void game_render(void) {
     for (int i = 0; i < runnerCount; i++) {
         runner_render(&runners[i]);
     }
-    //Render Pla
+    //Render Player
     player_render(&player);
-
+    EndMode2D();
     // UI Overlay
     Weapon currentWeapon = player.inventory[player.currentSlot];
     DrawText(TextFormat("WEAPON: %s", currentWeapon.name), 20, 20, 20, RAYWHITE);
