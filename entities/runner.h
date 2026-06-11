@@ -17,6 +17,7 @@ typedef struct {
     Vector2 lastKnownPos;   // Ultima posicion conocida del jugador
     float memoryTimer;      // Countdown de 10 segundos
     bool hasMemory;         // Flag: tiene posicion recordada activa
+    bool isAggro;
     bool onGround;
     bool isDead;
 } Runner;

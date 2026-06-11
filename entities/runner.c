@@ -17,6 +17,7 @@ Runner runner_init(float x, float y, float speedX) {
         .memoryTimer    = 0.0f,
         .hasMemory      = false,
         .onGround       = false,
+        .isAggro        = false,
         .detectTimer    = 0.0f,
         .isDead = false
     };
@@ -46,7 +47,8 @@ static bool runner_detect_player(Runner *r, Player *p) {
     float dx = (p->x + 20.0f) - (r->rect.x + r->rect.width / 2.0f);
     float dy = (p->y + 20.0f) - (r->rect.y + r->rect.height / 2.0f);
     float dist = sqrtf(dx * dx + dy * dy);
-    return dist <= RUNNER_DETECT_RANGE;
+    float range = r->isAggro ? RUNNER_DETECT_RANGE * 2.0f : RUNNER_DETECT_RANGE;
+    return dist <= range;
 }
 
 void runner_update(Runner *r, Player *p, float dt, float levelWidth, Rectangle *platforms, int platformCount) {
@@ -58,7 +60,7 @@ void runner_update(Runner *r, Player *p, float dt, float levelWidth, Rectangle *
     // Jugador detectado: actualizar ultima posicion conocida y resetear memoria
     if (r->playerDetected) {
         r->lastKnownPos = (Vector2){ p->x, p->y };
-        r->memoryTimer  = 10.0f;
+        r->memoryTimer  = 100.0f;
         r->hasMemory    = true;
     }
 
@@ -81,6 +83,11 @@ void runner_update(Runner *r, Player *p, float dt, float levelWidth, Rectangle *
             r->hasMemory = false;
     }
 
+    if (r->detectTimer <= 0.0f && r->playerDetected)
+        r->isAggro = true;
+    if (!r->playerDetected && !r->hasMemory)
+        r->isAggro = false;
+
     if (r->playerDetected || r->hasMemory) {
         // Target: jugador real o ultima posicion conocida
         float targetX = r->playerDetected ? p->x : r->lastKnownPos.x;
@@ -96,10 +103,8 @@ void runner_update(Runner *r, Player *p, float dt, float levelWidth, Rectangle *
         if (!r->playerDetected && r->hasMemory && fabsf(dx) < 20.0f)
             r->hasMemory = false;
 
-        // Player esta mas arriba: saltar
-        if (targetY < r->rect.y && r->onGround && runner_check_edge(r, platforms, platformCount))
+        if (targetY < r->rect.y - 20.0f && r->onGround)
             r->vy = -500.0f;
-        // Player esta mas abajo: dejarse caer por el hueco
         else if (targetY > r->rect.y && runner_check_edge(r, platforms, platformCount))
             r->speedX = dx > 0.0f ? 150.0f : -150.0f;
 
@@ -125,9 +130,7 @@ void runner_update(Runner *r, Player *p, float dt, float levelWidth, Rectangle *
             r->isDead = true;
             p->vy = -400.0f / 2.0f;
         } else {
-            p->x = 100.0f;
-            p->y = 300.0f;
-            p->vy = 0.0f;
+            player_respawn(p);  // sustituye las 3 líneas hardcodeadas
         }
     }
 }
@@ -151,15 +154,19 @@ void runner_render(const Runner *r) {
     DrawLineV((Vector2){startX, startY}, (Vector2){endX, endY}, GREEN);
 
     // Debug detection range
+    float displayRange = r->isAggro ? RUNNER_DETECT_RANGE * 2.0f : RUNNER_DETECT_RANGE;
     DrawCircleLines(
         (int)(r->rect.x + r->rect.width  / 2.0f),
                     (int)(r->rect.y + r->rect.height / 2.0f),
-                    RUNNER_DETECT_RANGE, YELLOW
+                    displayRange, YELLOW
     );
 
     // Debug texto
     int tx = (int)r->rect.x;
     int ty = (int)r->rect.y - 40;
+
+    //draw health
+    DrawText(TextFormat("HP: %.0f", r->health), tx, ty - 12, 10, GREEN);
 
     if (r->detectTimer > 0.0f) {
         DrawText(TextFormat("FREEZE %.1f", r->detectTimer), tx, ty, 10, YELLOW);

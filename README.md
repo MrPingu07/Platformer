@@ -1,15 +1,15 @@
 # 2D Data-Driven Platformer
-### C + Raylib — Pure systems, minimal bloat
+### C + Raylib — Modular, drop-in, zero heap growth
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  640×480 px  │  16×12 tiles  │  40×40 px/tile  │  C99  │
+│  640×480 px  │  40×40 px/tile  │  C99  │  Raylib 6.0   │
 └─────────────────────────────────────────────────────────┘
 ```
 
-> A modular 2D platformer built on strict separation of concerns.
-> Level geometry, hazard states, combat profiles and player mechanics
-> live in isolated modules the game loop just conducts.
+> A 2D platformer built on strict separation of concerns.
+> Every system is isolated, replaceable, and blind to the others.
+> The game loop conducts. Modules execute.
 
 ---
 
@@ -19,110 +19,129 @@
 .
 ├── assets/
 │   └── levels/
-│       └── level1.txt          # Plain-text spatial matrix
+│       └── level1.txt           # Plain-text spatial matrix
 ├── entities/
-│   ├── box.c / .h              # Breakable obstacles + bounce physics
-│   ├── bullet.c / .h           # Projectile pool + weapon profiles
-│   ├── runner.c / .h           # Patrol + gravity + stomp/damage states
-│   └── player.c / .h           # State machine, physics, aim system, inventory
+│   ├── box.c / .h               # Breakable obstacles + bounce physics
+│   ├── bullet.c / .h            # Projectile pool + polymorphic weapon profiles
+│   ├── collision.c / .h         # Environment, rect, and hittable resolution
+│   ├── drop.c / .h              # Weapon drop physics, probability, collection
+│   ├── hittable.h               # Generic damageable entity interface
+│   ├── player.c / .h            # Physics, movement, aim system, inventory
+│   └── runner.c / .h            # Patrol AI, detection, memory, aggro states
 ├── scenes/
-│   └── game.c / .h             # Scene coordinator + tilemap parser
-├── scene.h                     # Scene interface (Update/Render fn ptrs)
-├── main.c                      # Entry point — window + lifecycle
-└── platformer                  # Compiled binary
+│   ├── camera.c / .h            # Deadzone tracking + lerp + level clamp
+│   ├── level_loader.c / .h      # Tilemap parser — returns LevelData struct
+│   └── game.c / .h              # Scene coordinator — init, update, render
+├── scene.h                      # Scene interface (Update/Render fn ptrs)
+└── main.c                       # Entry point — window + lifecycle
 ```
 
 ---
 
-## Engine Philosophy
+## Architecture
 
-### Data-Driven Execution
-Level maps and world objects are never hardcoded. The engine parses
-plain-text `.txt` matrices at runtime. Swap a file, get a new level.
-Every entity — platforms, boxes, runners, player spawn — is derived
-from tile tokens at load time.
+### Data-Driven Level Loading
 
-### Complete System Encapsulation
-`game.c` is a pure executive controller. `Runner` and `Box` entities own
-their transformation loops, state flags and collision resolution entirely.
-Coordination happens through pointer injection, not globals.
+Levels are plain-text `.txt` tile matrices parsed at runtime by `level_loader.c`.
+No entity is hardcoded. Swap the file, get a new world.
 
-World collision resolution is handled by `game.c` and passed to entities
-as needed, so entity modules have zero knowledge of level geometry.
-A runner reacts to whatever tileset is loaded at that moment.
-
-### Polymorphic Weapon Dispatch
-No `if/else` chains in the main loop. Each weapon binds a `fireFunc`
-callback that executes its own ballistic profile independently.
+`load_level()` returns a self-contained `LevelData` struct. The scene unpacks it.
+The loader has zero knowledge of what the scene does with the data.
 
 ```c
-// Weapon bound at load time — dispatched polymorphically at runtime
-weapon.fireFunc(fireOrigin, aimDir, bullets, maxBullets);
+LevelData data = load_level("assets/levels/level1.txt");
+// platforms, runners, boxes, player spawn — all derived from the tile matrix
 ```
 
-### Directional Aim System
-Fire direction is resolved each frame from a normalized `Vector2 aimDir`
-derived from input state and player context. Weapons receive a direction
-vector, not a raw integer, making diagonal and vertical fire a natural
-extension of the same dispatch path.
-
----
-
-## Tilemap Token Dictionary
+Tile token dictionary:
 
 ```
 ┌───────┬─────────────────────┬──────────────────────────────────────┐
 │ Token │ Entity              │ Description                          │
 ├───────┼─────────────────────┼──────────────────────────────────────┤
-│   .   │ Air Space           │ Passable buffer — no physics alloc   │
-│   P   │ Player Spawn        │ Initial origin vector for the player │
+│   .   │ Air                 │ Passable buffer — no allocation      │
+│   P   │ Player Spawn        │ Initial origin vector                │
 │  # =  │ Solid Geometry      │ Static platforms and boundaries      │
 │   B   │ Destructible Box    │ Stomp-bounce breakable obstacle      │
-│   E   │ Runner              │ Patrolling hazard — stomp or damage  │
+│   E   │ Runner              │ Patrolling hazard entity             │
 └───────┴─────────────────────┴──────────────────────────────────────┘
 ```
 
-Example matrix fragment:
+### Module Isolation
+
+Each system owns its logic completely. `game.c` passes pointers and receives results.
+Nothing reaches across module boundaries without an explicit interface.
+
+`runner.c` has no knowledge of level geometry — it receives platform arrays as parameters.
+`collision.c` has no knowledge of entity types — it operates on `Rectangle` and `Hittable`.
+`drop.c` handles probability, physics, and collection internally — `game.c` calls one function.
+
+```c
+// game.c on runner death — full drop logic lives in drop.c
+drops_try_spawn(gameDrops, MAX_DROPS, x, y);
+```
+
+### Polymorphic Weapon Dispatch
+
+Weapons bind a `fireFunc` callback at creation time. The fire path is identical for all four profiles — no branching in the game loop.
+
+```c
+// Bound at load time, dispatched at runtime
+currentWeapon->fireFunc(fireOrigin, aimDir, bullets, maxBullets);
+```
+
+### Directional Aim System
+
+Fire direction resolves each frame from a normalized `Vector2 aimDir` derived from
+input state and player context. Weapons receive a direction vector — diagonal and
+vertical fire are natural extensions of the same dispatch path.
 
 ```
-................
-###.....E....###
-........B.......
-P...............
-================
+         W
+    W+A  ↑  W+D
+      ↖  │  ↗
+  A ←────●────→ D
+      ↙  │  ↘
+    S+A  ↓  S+D
+         S         (air only)
 ```
+
+### Runner AI
+
+Runners operate across four states driven by detection range and memory timers.
+
+```
+PATROL → FREEZE (1s) → AGGRO → MEMORY (last known position) → PATROL
+```
+
+Detection range doubles on entering AGGRO. Memory persists for 10 seconds after
+losing sight. Runners respect gravity, check edges before patrolling off platforms,
+and jump toward targets on higher ground.
+
+### Weapon Drop System
+
+Runners have a 5% drop chance on death. Drop type is weighted:
+
+| Weapon       | Weight |
+|--------------|--------|
+| Shotgun      | 75     |
+| Full-Auto    | 50     |
+| Flamethrower | 25     |
+
+Drops arc from the runner's position, land on platforms, and wait for collection.
+The player starts with Semi-Auto only. The second inventory slot is locked until a
+drop is collected.
 
 ---
 
 ## Weapon Profiles
 
-| Weapon        | Mechanic                                           | Mode  | Damage |
-|---------------|----------------------------------------------------|-------|--------|
-| Semi-Auto     | Single high-speed linear shot per tap              | Press | 34     |
-| Shotgun       | 5-pellet burst with symmetric angular spread       | Press | 15/pellet |
-| Full-Auto     | Continuous stream with perpendicular recoil spread | Hold  | 10     |
-| Flamethrower  | Dense short-range particle cluster with decay      | Hold  | 5      |
-
-Projectile lifecycle is managed by a centralized bullet memory pool
-(`MAX_BULLETS 100`). Allocation and deallocation never touch the heap at runtime.
-
-Each bullet carries a `damage` value set at spawn time by its weapon profile.
-Hit detection and health resolution happen in `game.c`, keeping entity modules
-free of cross-entity logic.
-
----
-
-## Runner
-
-Runners patrol horizontally, respect gravity, and react to the loaded tileset.
-They carry 100 HP and die either from bullet damage or a player stomp.
-
-| Condition          | Result                                  |
-|--------------------|-----------------------------------------|
-| Player stomps      | Runner dies, player gets upward bounce  |
-| Player touches     | Player reset to spawn                   |
-| Bullet hit         | Runner loses `bullet.damage` HP         |
-| HP reaches 0       | Runner marked dead, removed from render |
+| Weapon       | Mechanic                                          | Mode  | Damage     |
+|--------------|---------------------------------------------------|-------|------------|
+| Semi-Auto    | Single high-speed linear shot per tap             | Press | 34         |
+| Shotgun      | 5-pellet burst with angular spread                | Press | 15/pellet  |
+| Full-Auto    | Continuous stream with perpendicular recoil       | Hold  | 10         |
+| Flamethrower | Dense short-range particle cluster with decay     | Hold  | 5          |
 
 ---
 
@@ -130,7 +149,7 @@ They carry 100 HP and die either from bullet damage or a player stomp.
 
 ```
   ┌───┐                      ┌───┐
-  │ W │  Jump / Aim Up        │ Q │  Swap weapon slot
+  │ W │  Jump / Aim Up        │ Q │  Swap weapon (if slot 2 filled)
   └───┘                      └───┘
 ┌───┬───┐                 ┌───────┐
 │ A │ D │  Move            │ Space │  Fire active weapon
@@ -140,48 +159,30 @@ They carry 100 HP and die either from bullet damage or a player stomp.
   └───┘
 ```
 
-### Aim Direction Matrix
+---
+
+## Memory Model
+
+All instance arrays are statically bounded. No heap allocation at runtime.
 
 ```
-         W
-    W+A  ↑  W+D
-      ↖  │  ↗
-  A ←────●────→ D     (ground or air)
-      ↙  │  ↘
-    S+A  ↓  S+D       (air only)
-         S
+platforms[255]   boxes[255]   runners[255]   bulletPool[100]   drops[32]
+      ↓               ↓             ↓               ↓               ↓
+[ deterministic bounds — zero heap growth during gameplay ]
 ```
-
-Holding `W` on the ground with no horizontal input locks the X axis.
-Crouching reduces movement speed by half and shifts the muzzle origin downward.
-Diagonal and downward fire is only available in the air.
 
 ---
 
 ## Build
 
 ```bash
-gcc main.c scenes/game.c entities/player.c entities/runner.c \
-    entities/box.c entities/bullet.c \
+gcc main.c scenes/game.c scenes/level_loader.c scenes/camera.c \
+    entities/player.c entities/runner.c entities/box.c \
+    entities/bullet.c entities/collision.c entities/drop.c \
     -o platformer -lraylib -lm
 ```
 
-> Dependencies: [Raylib](https://www.raylib.com/) — `pacman -S raylib`
-
----
-
-## Memory Model
-
-Instance counts are tracked via live index registers at runtime:
-
-```
-platformCount   boxCount   runnerCount   bulletPool[MAX_BULLETS]
-     ↓               ↓           ↓               ↓
-[ deterministic bounds — no heap growth during gameplay ]
-```
-
-All live instance arrays are statically bounded to maintain predictable
-memory footprints and eliminate leak vectors in long sessions.
+> Dependencies: [Raylib](https://www.raylib.com/)
 
 ---
 

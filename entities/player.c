@@ -4,16 +4,25 @@
 #include <raylib.h>
 
 #define GRAVITY     800.0f
-#define MOVE_SPEED  300.0f
 #define ACCELERATION 1800.0f
 #define JUMP_FORCE  -400.0f
 
 Player player_init(float x, float y) {
     Player p = {x, y, 0, false, 1};
-    p.inventory[0] = weapon_create(WEAPON_FULLAUTO);
-    p.inventory[1] = weapon_create(WEAPON_FLAMETHROWER);
+    p.spawnX = x;
+    p.spawnY = y;
+    p.inventory[0] = weapon_create(WEAPON_SEMIAUTO);
+    p.inventory[1] = weapon_create(WEAPON_COUNT);  // empty slot
     p.currentSlot = 0;
     return p;
+}
+
+void player_respawn(Player *p) {
+    p->x  = p->spawnX;
+    p->y  = p->spawnY;
+    p->vx = 0.0f;
+    p->vy = 0.0f;
+    p->onGround = false;
 }
 
 // Resolves aim direction vector from directional input and player state
@@ -43,7 +52,8 @@ void player_handle_combat(Player *p, Bullet *bullets, int maxBullets, float dt) 
         currentWeapon->cooldown -= dt;
 
     if (IsKeyPressed(KEY_Q))
-        p->currentSlot = (p->currentSlot + 1) % 2;
+        if (IsKeyPressed(KEY_Q) && p->inventory[1].type != WEAPON_COUNT)
+            p->currentSlot = (p->currentSlot + 1) % 2;
 
     bool wantsToFire = currentWeapon->isAutomatic
     ? IsKeyDown(KEY_SPACE)
@@ -80,5 +90,38 @@ void player_render(Player *p) {
     }
     DrawText(TextFormat("y:%.0f onGround:%d crouch:%d", p->y, p->onGround, p->isCrouching), 20, 60, 16, YELLOW);
     DrawText(TextFormat("y:%.0f onGround:%d crouch:%d vy:%.0f", p->y, p->onGround, p->isCrouching, p->vy), 20, 60, 16, YELLOW);
+}
 
+void player_handle_movement(Player *p, int levelWidth, float dt) {
+    float speed = p->isCrouching ? MOVE_SPEED * 0.5f : MOVE_SPEED;
+    bool lockX = IsKeyDown(KEY_W) && p->onGround &&
+    !IsKeyDown(KEY_A) && !IsKeyDown(KEY_D);
+
+    if (!lockX) {
+        float accel = p->onGround ? ACCELERATION : AIR_ACCELERATION;
+
+        if (IsKeyDown(KEY_D)) { p->vx += accel * dt; p->facing =  1; }
+        else if (IsKeyDown(KEY_A)) { p->vx -= accel * dt; p->facing = -1; }
+
+        if (p->vx >  speed) p->vx =  speed;
+        if (p->vx < -speed) p->vx = -speed;
+
+        p->x += p->vx * dt;
+
+        if (p->x < 0.0f) { p->x = 0.0f; p->vx = 0.0f; }
+        if (p->x + 40.0f > levelWidth) { p->x = levelWidth - 40.0f; p->vx = 0.0f; }
+    }
+
+    if (!IsKeyDown(KEY_A) && !IsKeyDown(KEY_D)) {
+        float friction = p->onGround ? FRICTION : AIR_FRICTION;
+        if (p->vx > 0.0f) { p->vx -= friction * dt; if (p->vx < 0.0f) p->vx = 0.0f; }
+        if (p->vx < 0.0f) { p->vx += friction * dt; if (p->vx > 0.0f) p->vx = 0.0f; }
+    }
+
+    p->isCrouching = IsKeyDown(KEY_S) && p->onGround;
+
+    if (IsKeyPressed(KEY_W) && p->onGround && !p->isCrouching) {
+        p->vy = -400.0f;
+        p->onGround = false;
+    }
 }
