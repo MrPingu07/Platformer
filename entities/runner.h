@@ -1,9 +1,11 @@
-// entities/enemy.h
+// entities/runner.h
 #pragma once
 #include <raylib.h>
 #include "player.h"
 
-#define RUNNER_DETECT_RANGE 200.0f
+#define RUNNER_DETECT_RANGE  200.0f
+#define RUNNER_MEMORY_TIME   100.0f
+#define RUNNER_SPEED         100.0f
 
 // Represents a patrolling enemy entity
 typedef struct {

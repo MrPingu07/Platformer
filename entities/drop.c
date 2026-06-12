@@ -23,10 +23,15 @@ Drop drop_create(float x, float y) {
     };
 }
 
-void drops_update(Drop *drops, int maxDrops, Rectangle *platforms, int platformCount, float dt) {
+void drops_update(Drop *drops, int maxDrops, Rectangle *platforms, int platformCount, int levelHeight, float dt) {
     for (int i = 0; i < maxDrops; i++) {
         if (drops[i].isCollected) continue;
         if (drops[i].onGround) continue;
+
+        if (drops[i].position.y > levelHeight) {
+            drops[i].isCollected = true;
+            continue;
+        }
 
         drops[i].velocity.y += DROP_GRAVITY * dt;
         drops[i].position.x += drops[i].velocity.x * dt;
@@ -78,8 +83,10 @@ bool drops_collect(Drop *drops, int maxDrops, Player *p) {
     return false;
 }
 
-void drops_try_spawn(Drop *drops, int maxDrops, float x, float y) {
-    if (GetRandomValue(1, 100) > 5) return;
+void drops_try_spawn(Drop *drops, int maxDrops, float x, float y, int killCount) {
+    int chance = 5 + killCount;
+    if (chance > 80) chance = 80;
+    if (GetRandomValue(1, 100) > chance) return;
     for (int i = 0; i < maxDrops; i++) {
         if (drops[i].isCollected) {
             drops[i] = drop_create(x, y);

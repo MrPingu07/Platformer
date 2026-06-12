@@ -34,3 +34,23 @@ void camera_update(Camera2D *cam, Vector2 playerCenter, int levelWidth, int leve
     if (cam->target.y < halfH)               cam->target.y = halfH;
     if (cam->target.y > levelHeight - halfH) cam->target.y = levelHeight - halfH;
 }
+
+Rectangle camera_get_viewport(const Camera2D *cam) {
+    return (Rectangle){
+        cam->target.x - cam->offset.x,
+        cam->target.y - cam->offset.y,
+        cam->offset.x * 2.0f,
+        cam->offset.y * 2.0f
+    };
+}
+
+Rectangle camera_get_logic_bounds(const Camera2D *cam) {
+    float w = cam->offset.x * 2.0f * 3.0f;
+    float h = cam->offset.y * 2.0f * 3.0f;
+    return (Rectangle){
+        cam->target.x - w / 2.0f,
+        cam->target.y - h / 2.0f,
+        w,
+        h
+    };
+}

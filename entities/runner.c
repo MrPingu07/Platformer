@@ -1,4 +1,4 @@
-// entities/enemy.c
+// entities/runner.c
 #include "runner.h"
 #include <math.h>
 
@@ -60,7 +60,7 @@ void runner_update(Runner *r, Player *p, float dt, float levelWidth, Rectangle *
     // Jugador detectado: actualizar ultima posicion conocida y resetear memoria
     if (r->playerDetected) {
         r->lastKnownPos = (Vector2){ p->x, p->y };
-        r->memoryTimer  = 100.0f;
+        r->memoryTimer  = RUNNER_MEMORY_TIME;
         r->hasMemory    = true;
     }
 
@@ -99,14 +99,11 @@ void runner_update(Runner *r, Player *p, float dt, float levelWidth, Rectangle *
         r->speedX = dx > 0.0f ? 150.0f : -150.0f;
         r->facing = dx > 0.0f ? 1 : -1;
 
-        // Llegó a la ultima posicion conocida: olvidar
         if (!r->playerDetected && r->hasMemory && fabsf(dx) < 20.0f)
             r->hasMemory = false;
 
         if (targetY < r->rect.y - 20.0f && r->onGround)
             r->vy = -500.0f;
-        else if (targetY > r->rect.y && runner_check_edge(r, platforms, platformCount))
-            r->speedX = dx > 0.0f ? 150.0f : -150.0f;
 
     } else {
         // Modo patrulla
@@ -147,6 +144,7 @@ void runner_render(const Runner *r) {
     DrawRectangleRec(r->rect, bodyColor);
 
     // Debug raycast
+#ifdef DEBUG
     float startX = r->facing == 1 ? r->rect.x + r->rect.width : r->rect.x;
     float startY = r->rect.y;
     float endX   = startX + r->facing * 0.707f * EDGE_RAY_LENGTH;
@@ -177,4 +175,5 @@ void runner_render(const Runner *r) {
     } else {
         DrawText("PATROL", tx, ty, 10, LIGHTGRAY);
     }
+#endif
 }

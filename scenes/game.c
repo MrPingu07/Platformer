@@ -16,21 +16,24 @@ static int       levelWidth  = 0;
 static int       levelHeight = 0;
 static Camera2D  camera = { 0 };
 static Player    player;
-static Runner    runners[255];
+static Runner    runners[MAX_RUNNERS];
 static int       runnerCount;
-static Box       boxes[255];
+static Box       boxes[MAX_BOXES];
 static int       boxCount;
-static Rectangle platforms[255];
+static Rectangle platforms[MAX_PLATFORMS];
 static int       platformCount;
 static Bullet    gameBullets[MAX_BULLETS];
 static Drop      gameDrops[MAX_DROPS];
+static bool      aliveSnapshot[MAX_RUNNERS];
+static int       killCount = 0;
 
 // --- Scene Lifecycle: Init ---
 static void game_init(void) {
     // Reset all entity counters before loading
     platformCount = 0;
-    boxCount = 0;
-    runnerCount = 0;
+    boxCount      = 0;
+    runnerCount   = 0;
+    killCount     = 0;
 
     // Reset projectile pool
     for (int i = 0; i < MAX_BULLETS; i++) {
@@ -61,6 +64,9 @@ static void game_update(float dt) {
     player_update(&player, dt);
     resolve_environment_collisions(&player, platforms, platformCount);
 
+    if (player.y > levelHeight)
+        player_respawn(&player);
+
     //Handle Movement
     player_handle_movement(&player, levelWidth, dt);
 
@@ -69,10 +75,11 @@ static void game_update(float dt) {
     bullets_update(gameBullets, MAX_BULLETS, dt);
 
     //Drops system
-    drops_update(gameDrops, MAX_DROPS, platforms, platformCount, dt);
+    drops_update(gameDrops, MAX_DROPS, platforms, platformCount, levelHeight, dt);
     drops_collect(gameDrops, MAX_DROPS, &player);
 
-    bool aliveSnapshot[255] = { false };
+    for (int i = 0; i < runnerCount; i++) aliveSnapshot[i] = false;
+
     for (int i = 0; i < runnerCount; i++)
         aliveSnapshot[i] = !runners[i].isDead;
 
@@ -87,13 +94,22 @@ static void game_update(float dt) {
     }
     resolve_bullet_hittable_collisions(targets, targetCount, gameBullets, MAX_BULLETS);
 
+    Rectangle logicBounds = camera_get_logic_bounds(&camera);
+
     for (int i = 0; i < runnerCount; i++) {
+        if (!CheckCollisionRecs(runners[i].rect, logicBounds)) continue;
         runner_update(&runners[i], &player, dt, (float)levelWidth, platforms, platformCount);
 
-        if (aliveSnapshot[i] && runners[i].isDead)
+        if (aliveSnapshot[i] && runners[i].isDead) {
+            killCount++;
             drops_try_spawn(gameDrops, MAX_DROPS,
                             runners[i].rect.x + runners[i].rect.width / 2.0f,
-                            runners[i].rect.y);
+                            runners[i].rect.y,
+                            killCount);
+        }
+
+        if (runners[i].rect.y > levelHeight)
+            runners[i].isDead = true;
 
         runners[i].onGround = false;
         resolve_rect_collision(&runners[i].rect, &runners[i].vy, platforms, platformCount, &runners[i].onGround);
@@ -129,9 +145,13 @@ static void game_render(void) {
     drops_render(gameDrops, MAX_DROPS);
 
     //Render Runner
+    Rectangle viewport = camera_get_viewport(&camera);
+
     for (int i = 0; i < runnerCount; i++) {
+        if (!CheckCollisionRecs(runners[i].rect, viewport)) continue;
         runner_render(&runners[i]);
     }
+
     //Render Player
     player_render(&player);
     EndMode2D();
@@ -139,6 +159,17 @@ static void game_render(void) {
     Weapon currentWeapon = player.inventory[player.currentSlot];
     DrawText(TextFormat("WEAPON: %s", currentWeapon.name), 20, 20, 20, RAYWHITE);
     DrawText("A/D: Move  W: Jump  SPACE: Fire  Q: Swap", 20, 450, 10, LIGHTGRAY);
+    //DEBUG
+    #ifdef DEBUG
+    Rectangle logicBounds = camera_get_logic_bounds(&camera);
+    int rendered = 0, active = 0;
+    for (int i = 0; i < runnerCount; i++) {
+        if (runners[i].isDead) continue;
+        if (CheckCollisionRecs(runners[i].rect, viewport))    rendered++;
+        if (CheckCollisionRecs(runners[i].rect, logicBounds)) active++;
+    }
+    DrawText(TextFormat("RUNNERS  render:%d  logic:%d  total:%d", rendered, active, runnerCount), 20, 40, 14, LIME);
+    #endif//End DEBUG
     EndDrawing();
 }
 

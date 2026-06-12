@@ -4,7 +4,6 @@
 #include <raylib.h>
 
 #define GRAVITY     800.0f
-#define ACCELERATION 1800.0f
 #define JUMP_FORCE  -400.0f
 
 Player player_init(float x, float y) {
@@ -22,7 +21,10 @@ void player_respawn(Player *p) {
     p->y  = p->spawnY;
     p->vx = 0.0f;
     p->vy = 0.0f;
-    p->onGround = false;
+    p->onGround  = false;
+    p->currentSlot   = 0;
+    p->inventory[0]  = weapon_create(WEAPON_SEMIAUTO);
+    p->inventory[1]  = weapon_create(WEAPON_COUNT);
 }
 
 // Resolves aim direction vector from directional input and player state
@@ -51,9 +53,8 @@ void player_handle_combat(Player *p, Bullet *bullets, int maxBullets, float dt) 
     if (currentWeapon->cooldown > 0.0f)
         currentWeapon->cooldown -= dt;
 
-    if (IsKeyPressed(KEY_Q))
-        if (IsKeyPressed(KEY_Q) && p->inventory[1].type != WEAPON_COUNT)
-            p->currentSlot = (p->currentSlot + 1) % 2;
+    if (IsKeyPressed(KEY_Q) && p->inventory[1].type != WEAPON_COUNT)
+        p->currentSlot = (p->currentSlot + 1) % 2;
 
     bool wantsToFire = currentWeapon->isAutomatic
     ? IsKeyDown(KEY_SPACE)
@@ -88,8 +89,6 @@ void player_render(Player *p) {
     } else {
         DrawRectangle((int)p->x, (int)p->y, 40, 40, BLUE);
     }
-    DrawText(TextFormat("y:%.0f onGround:%d crouch:%d", p->y, p->onGround, p->isCrouching), 20, 60, 16, YELLOW);
-    DrawText(TextFormat("y:%.0f onGround:%d crouch:%d vy:%.0f", p->y, p->onGround, p->isCrouching, p->vy), 20, 60, 16, YELLOW);
 }
 
 void player_handle_movement(Player *p, int levelWidth, float dt) {

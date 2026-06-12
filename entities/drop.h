@@ -16,7 +16,7 @@ typedef struct {
 } Drop;
 
 Drop drop_create(float x, float y);
-void drops_update(Drop *drops, int maxDrops, Rectangle *platforms, int platformCount, float dt);
+void drops_update(Drop *drops, int maxDrops, Rectangle *platforms, int platformCount, int levelHeight, float dt);
 void drops_render(const Drop *drops, int maxDrops);
 bool drops_collect(Drop *drops, int maxDrops, Player *p);
-void drops_try_spawn(Drop *drops, int maxDrops, float x, float y);
+void drops_try_spawn(Drop *drops, int maxDrops, float x, float y, int killCount);

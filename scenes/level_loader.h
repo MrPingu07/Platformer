@@ -5,9 +5,9 @@
 #include "../entities/runner.h"
 #include "../entities/box.h"
 
-#define MAX_PLATFORMS 255
-#define MAX_BOXES     255
-#define MAX_RUNNERS   255
+#define MAX_PLATFORMS 2048
+#define MAX_BOXES     2048
+#define MAX_RUNNERS   2048
 
 typedef struct {
     Rectangle platforms[MAX_PLATFORMS];

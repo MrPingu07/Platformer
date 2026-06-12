@@ -1,5 +1,6 @@
 // scenes/level_loader.c
 #include "level_loader.h"
+#include "../entities/runner.h"
 #include <raylib.h>
 #include <stdio.h>
 
@@ -79,7 +80,7 @@ LevelData load_level(const char *filename) {
                 break;
             case 'E':
                 if (data.runnerCount < MAX_RUNNERS) {
-                    data.runners[data.runnerCount++] = runner_init(posX, posY, 100.0f);
+                    data.runners[data.runnerCount++] = runner_init(posX, posY, RUNNER_SPEED);
                 }
                 break;
             case '.':
@@ -92,6 +93,7 @@ LevelData load_level(const char *filename) {
             col = 0;
             row++;
         }
+
     }
 
     if (!playerSpawned)
