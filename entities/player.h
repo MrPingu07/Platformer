@@ -2,13 +2,14 @@
 #pragma once
 
 #include <raylib.h>
-#include "bullet.h" // Required for the Weapon type and inventory
+#include "bullet.h"        // Required for the Weapon type and inventory
+#include "../defines.h"
 
-#define MOVE_SPEED       300.0f
-#define ACCELERATION     1800.0f
-#define AIR_ACCELERATION 400.0f
-#define FRICTION         1400.0f
-#define AIR_FRICTION     300.0f
+#define MOVE_SPEED       (TILE_SIZE * 7.5f)
+#define ACCELERATION     (TILE_SIZE * 45.0f)
+#define AIR_ACCELERATION (TILE_SIZE * 10.0f)
+#define FRICTION         (TILE_SIZE * 35.0f)
+#define AIR_FRICTION     (TILE_SIZE * 7.5f)
 
 // Player entity with physics, state, and inventory management
 typedef struct {

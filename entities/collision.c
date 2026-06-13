@@ -1,18 +1,19 @@
 // entities/collision.c
 #include "collision.h"
+#include "../defines.h"
 
 void resolve_environment_collisions(Player *p, Rectangle *platforms, int count) {
-    float playerH = p->isCrouching ? 20.0f : 40.0f;
-    float playerW = p->isCrouching ? 50.0f : 40.0f;
-    float offsetX = p->isCrouching ? -5.0f : 0.0f;
+    float playerH = p->isCrouching ? TILE_SIZE * 0.5f  : TILE_SIZE;
+    float playerW = p->isCrouching ? TILE_SIZE * 1.25f : TILE_SIZE;
+    float offsetX = p->isCrouching ? -TILE_SIZE * 0.125f : 0.0f;
 
     for (int i = 0; i < count; i++) {
-        Rectangle playerRect = { p->x + offsetX, p->y + (40.0f - playerH), playerW, playerH };
+        Rectangle playerRect = { p->x + offsetX, p->y + (TILE_SIZE - playerH), playerW, playerH };
         if (p->vy >= 0.0f &&
             CheckCollisionRecs(playerRect, platforms[i]) &&
             (playerRect.y + playerH <= platforms[i].y + 20))
         {
-            p->y = platforms[i].y - playerH - (40.0f - playerH);
+            p->y = platforms[i].y - playerH - (TILE_SIZE - playerH);
             p->vy = 0;
             p->onGround = true;
         }

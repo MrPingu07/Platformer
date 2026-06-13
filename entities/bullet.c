@@ -1,5 +1,6 @@
 // entities/bullet.c
 #include "bullet.h"
+#include "../defines.h"
 
 // Loops through the pre-allocated pool to find and initialize an inactive bullet slot
 void spawn_bullet(Bullet* bullets, int maxBullets, Vector2 pos, Vector2 vel, float radius, float damage, float lifetime, Color color) {
@@ -23,24 +24,23 @@ void spawn_bullet(Bullet* bullets, int maxBullets, Vector2 pos, Vector2 vel, flo
 
 // Semiauto. High-speed, high-precision straight single shot
 static void fire_semiauto(Vector2 origin, Vector2 aimDir, Bullet* bullets, int max) {
-    Vector2 vel = { aimDir.x * 600.0f, aimDir.y * 600.0f };
-    spawn_bullet(bullets, max, origin, vel, 4.0f, 34.0f, 2.0f, YELLOW);
+    Vector2 vel = { aimDir.x * TILE_SIZE * 15.0f, aimDir.y * TILE_SIZE * 15.0f };
+    spawn_bullet(bullets, max, origin, vel, TILE_SIZE * 0.1f, 34.0f, 2.0f, YELLOW);
 }
 
 // Full Auto. Continuous fire stream with a minor vertical recoil simulation
 static void fire_fullauto(Vector2 origin, Vector2 aimDir, Bullet* bullets, int max) {
-    // Recoil in an axis perpendicular to shooting direction
-    float spread = (float)GetRandomValue(-30, 30);
+    float spread = (float)GetRandomValue((int)(-TILE_SIZE * 0.75f), (int)(TILE_SIZE * 0.75f));
     Vector2 vel = {
-        aimDir.x * 550.0f + (aimDir.y != 0.0f ? spread : 0.0f),
-        aimDir.y * 550.0f + (aimDir.x != 0.0f ? spread : 0.0f)
+        aimDir.x * TILE_SIZE * 13.75f + (aimDir.y != 0.0f ? spread : 0.0f),
+        aimDir.y * TILE_SIZE * 13.75f + (aimDir.x != 0.0f ? spread : 0.0f)
     };
-    spawn_bullet(bullets, max, origin, vel, 4.0f, 10.0f, 1.5f, ORANGE);
+    spawn_bullet(bullets, max, origin, vel, TILE_SIZE * 0.1f, 10.0f, 1.5f, ORANGE);
 }
 
 // Shotgun. Multi-projectile spread pattern casting 5 distinct angular vectors
 static void fire_shotgun(Vector2 origin, Vector2 aimDir, Bullet* bullets, int max) {
-    float baseSpeed = 500.0f;
+    float baseSpeed = TILE_SIZE * 12.5f;
 
     // Perpendicular vector for spread
     Vector2 perp = { -aimDir.y, aimDir.x };
@@ -51,20 +51,20 @@ static void fire_shotgun(Vector2 origin, Vector2 aimDir, Bullet* bullets, int ma
             (aimDir.x + perp.x * spreads[i]) * baseSpeed,
             (aimDir.y + perp.y * spreads[i]) * baseSpeed
         };
-        spawn_bullet(bullets, max, origin, vel, 4.0f, 15.0f, 0.5f, GOLD);
+        spawn_bullet(bullets, max, origin, vel, TILE_SIZE * 0.1f, 15.0f, 0.5f, GOLD);
     }
 }
 
 // Flamethrower. High-density, short-range particle simulation with randomized scale outputs
 static void fire_flamethrower(Vector2 origin, Vector2 aimDir, Bullet* bullets, int max) {
-    float speed  = (float)GetRandomValue(400, 500);
-    float spread = (float)GetRandomValue(-100, 100);
+    float speed  = (float)GetRandomValue((int)(TILE_SIZE * 10.0f), (int)(TILE_SIZE * 12.5f));
+    float spread = (float)GetRandomValue((int)(-TILE_SIZE * 2.5f), (int)(TILE_SIZE * 2.5f));
     Vector2 perp = { -aimDir.y, aimDir.x };
     Vector2 vel  = {
         aimDir.x * speed + perp.x * spread,
         aimDir.y * speed + perp.y * spread
     };
-    float randomSize = (float)GetRandomValue(6, 12);
+    float randomSize = TILE_SIZE * (float)GetRandomValue(6, 12) * 0.1f;
     spawn_bullet(bullets, max, origin, vel, randomSize, 5.0f, 0.8f, RED);
 }
 

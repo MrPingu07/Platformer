@@ -1,13 +1,14 @@
 // entities/runner.c
 #include "runner.h"
+#include "../defines.h"
 #include <math.h>
 
-#define EDGE_RAY_LENGTH 80.0f
+#define EDGE_RAY_LENGTH (TILE_SIZE * 2.0f)
 #define EDGE_RAY_STEPS  8
 
 Runner runner_init(float x, float y, float speedX) {
     return (Runner){
-        .rect = (Rectangle){ x, y, 40.0f, 40.0f },
+        .rect = (Rectangle){ x, y, TILE_SIZE, TILE_SIZE },
         .speedX = speedX,
         .vy = 0.0f,
         .facing  = speedX >= 0.0f ? 1 : -1,
@@ -71,7 +72,7 @@ void runner_update(Runner *r, Player *p, float dt, float levelWidth, Rectangle *
     // Freeze de realization
     if (r->detectTimer > 0.0f) {
         r->detectTimer -= dt;
-        r->vy += 800.0f * dt;
+        r->vy += TILE_SIZE * 80.0f * dt;
         r->rect.y += r->vy * dt;
         return;
     }
@@ -96,14 +97,14 @@ void runner_update(Runner *r, Player *p, float dt, float levelWidth, Rectangle *
         float dx = targetX - r->rect.x;
         float dy = targetY - r->rect.y;
 
-        r->speedX = dx > 0.0f ? 150.0f : -150.0f;
+        r->speedX = dx > 0.0f ? RUNNER_SPEED * 1.5f : -RUNNER_SPEED * 1.5f;
         r->facing = dx > 0.0f ? 1 : -1;
 
         if (!r->playerDetected && r->hasMemory && fabsf(dx) < 20.0f)
             r->hasMemory = false;
 
         if (targetY < r->rect.y - 20.0f && r->onGround)
-            r->vy = -500.0f;
+            r->vy = -(TILE_SIZE * 12.5f);
 
     } else {
         // Modo patrulla
@@ -114,18 +115,18 @@ void runner_update(Runner *r, Player *p, float dt, float levelWidth, Rectangle *
     }
 
     r->rect.x += r->speedX * dt;
-    r->vy += 800.0f * dt;
+    r->vy += (TILE_SIZE * 20.0f) * dt;
     r->rect.y += r->vy * dt;
 
     if (r->rect.x <= 0.0f || r->rect.x + r->rect.width >= levelWidth)
         r->speedX *= -1.0f;
 
-    Rectangle playerRect = { p->x, p->y, 40.0f, 40.0f };
+    Rectangle playerRect = { p->x, p->y, TILE_SIZE, TILE_SIZE };
     if (CheckCollisionRecs(playerRect, r->rect)) {
-        bool isStomping = (p->vy > 0.0f) && (p->y + 40.0f < r->rect.y + 20.0f);
+        bool isStomping = (p->vy > 0.0f) && (p->y + TILE_SIZE < r->rect.y + TILE_SIZE * 0.5f);
         if (isStomping) {
             r->isDead = true;
-            p->vy = -400.0f / 2.0f;
+            p->vy = -(TILE_SIZE * 10.0f) * 0.5f;
         } else {
             player_respawn(p);  // sustituye las 3 líneas hardcodeadas
         }

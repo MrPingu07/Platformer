@@ -1,10 +1,11 @@
 // entities/player.c
 #include "player.h"
 #include "bullet.h"
+#include "../defines.h"
 #include <raylib.h>
 
-#define GRAVITY     800.0f
-#define JUMP_FORCE  -400.0f
+#define GRAVITY    (TILE_SIZE * 20.0f)
+#define JUMP_FORCE (TILE_SIZE * -10.0f)
 
 Player player_init(float x, float y) {
     Player p = {x, y, 0, false, 1};
@@ -65,9 +66,9 @@ void player_handle_combat(Player *p, Bullet *bullets, int maxBullets, float dt) 
         Vector2 fireOrigin;
         // Muzzle origin offset shifts to bottom-center when crouching
         if (p->isCrouching) {
-            fireOrigin = (Vector2){ p->x + 20.0f, p->y + 30.0f };
+            fireOrigin = (Vector2){ p->x + TILE_SIZE * 0.5f, p->y + TILE_SIZE * 0.75f };
         } else {
-            fireOrigin = (Vector2){ p->x + 20.0f, p->y + 20.0f };
+            fireOrigin = (Vector2){ p->x + TILE_SIZE * 0.5f, p->y + TILE_SIZE * 0.5f };
         }
 
         currentWeapon->fireFunc(fireOrigin, p->aimDir, bullets, maxBullets);
@@ -78,16 +79,22 @@ void player_handle_combat(Player *p, Bullet *bullets, int maxBullets, float dt) 
 // Apply gravity accumulation and integrate vertical position
 void player_update(Player *p, float dt) {
     p->vy += GRAVITY * dt;
-    if (p->vy > 500.0f) p->vy = 500.0f;
+    if (p->vy > TILE_SIZE * 50.0f) p->vy = TILE_SIZE * 50.0f;
     p->y += p->vy * dt;
 }
 
 void player_render(Player *p) {
     // Render crouched hitbox: shorter, slightly wider
     if (p->isCrouching) {
-        DrawRectangle((int)p->x - 5, (int)p->y + 20, 50, 20, BLUE);
+        DrawRectangle(
+            (int)(p->x - TILE_SIZE * 0.125f),
+                      (int)(p->y + TILE_SIZE * 0.5f),
+                      (int)(TILE_SIZE * 1.25f),
+                      (int)(TILE_SIZE * 0.5f),
+                      BLUE
+        );
     } else {
-        DrawRectangle((int)p->x, (int)p->y, 40, 40, BLUE);
+        DrawRectangle((int)p->x, (int)p->y, (int)TILE_SIZE, (int)TILE_SIZE, BLUE);
     }
 }
 
@@ -108,7 +115,7 @@ void player_handle_movement(Player *p, int levelWidth, float dt) {
         p->x += p->vx * dt;
 
         if (p->x < 0.0f) { p->x = 0.0f; p->vx = 0.0f; }
-        if (p->x + 40.0f > levelWidth) { p->x = levelWidth - 40.0f; p->vx = 0.0f; }
+        if (p->x + TILE_SIZE > levelWidth) { p->x = levelWidth - TILE_SIZE; p->vx = 0.0f; }
     }
 
     if (!IsKeyDown(KEY_A) && !IsKeyDown(KEY_D)) {
@@ -120,7 +127,7 @@ void player_handle_movement(Player *p, int levelWidth, float dt) {
     p->isCrouching = IsKeyDown(KEY_S) && p->onGround;
 
     if (IsKeyPressed(KEY_W) && p->onGround && !p->isCrouching) {
-        p->vy = -400.0f;
+        p->vy = JUMP_FORCE;
         p->onGround = false;
     }
 }

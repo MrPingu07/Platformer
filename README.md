@@ -3,7 +3,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  640×480 px  │  40×40 px/tile  │  C99  │  Raylib 6.0    │
+│  640×480 px  │  25px/tile  │  C99  │  Raylib 6.0        │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -32,6 +32,7 @@
 │   ├── camera.c / .h            # Deadzone tracking, lerp, level clamp, culling rects
 │   ├── level_loader.c / .h      # Tilemap parser - returns LevelData struct
 │   └── game.c / .h              # Scene coordinator - init, update, render
+├── defines.h                    # Global constants - TILE_SIZE, TILE_SCREEN_SIZE, shared defines
 ├── scene.h                      # Scene interface (Update/Render fn ptrs)
 ├── ROADMAP.md                   # Feature backlog and priorities
 └── main.c                       # Entry point - window + lifecycle
@@ -64,7 +65,7 @@ Tile token dictionary:
 │   P   │ Player Spawn        │ Initial origin vector                │
 │  # =  │ Solid Geometry      │ Static platforms and boundaries      │
 │   B   │ Destructible Box    │ Stomp-bounce breakable obstacle      │
-│   E   │ Runner              │ Patrolling hazard entity             │
+│   R   │ Runner              │ Patrolling hazard entity             │
 └───────┴─────────────────────┴──────────────────────────────────────┘
 ```
 
@@ -76,6 +77,32 @@ Nothing reaches across module boundaries without an explicit interface.
 `runner.c` has no knowledge of level geometry - it receives platform arrays as parameters.
 `collision.c` has no knowledge of entity types - it operates on `Rectangle` and `Hittable`.
 `drop.c` handles probability, physics, and collection internally - `game.c` calls one function.
+
+### TILE_SIZE - Single Source of Truth
+
+All world-space dimensions, velocities, forces, and entity sizes derive from `TILE_SIZE`
+defined in `defines.h`. Changing one value rescales the entire simulation.
+
+```c
+// defines.h
+#define TILE_SIZE        25.0f
+#define TILE_SCREEN_SIZE 40.0f
+
+// Everything else is a ratio
+#define MOVE_SPEED   (TILE_SIZE * 7.5f)
+#define GRAVITY      (TILE_SIZE * 20.0f)
+#define RUNNER_SPEED (TILE_SIZE * 2.5f)
+```
+
+Camera zoom is derived from `TILE_SCREEN_SIZE / TILE_SIZE`, keeping the visual footprint
+of the player constant regardless of `TILE_SIZE`:
+
+```c
+cam->zoom = TILE_SCREEN_SIZE / TILE_SIZE;
+```
+
+`TILE_SIZE` controls simulation granularity. `TILE_SCREEN_SIZE` controls visual scale.
+Both are independent.
 
 ### Polymorphic Weapon Dispatch
 
@@ -94,30 +121,30 @@ Runners operate across four states driven by detection range and memory timers.
 PATROL → FREEZE (1s) → AGGRO → MEMORY (last known position) → PATROL
 ```
 
-Detection range doubles on entering AGGRO. Memory persists for `RUNNER_MEMORY_TIME` seconds after
-losing sight. Runners respect gravity, check edges before patrolling off platforms,
+Detection range doubles on entering AGGRO. Memory persists for `RUNNER_MEMORY_TIME` seconds
+after losing sight. Runners respect gravity, check edges before patrolling off platforms,
 and jump toward targets on higher ground.
 
 ### Culling System
 
 Two rectangular regions are computed every frame from the active `Camera2D` in `camera.c`.
-Both are available to any scene - no coupling to `game.c`.
+Both regions operate in world-space and are available to any scene.
 
 ```c
-Rectangle camera_get_viewport(const Camera2D *cam);     // Exact screen bounds
+Rectangle camera_get_viewport(const Camera2D *cam);     // Exact screen bounds in world-space
 Rectangle camera_get_logic_bounds(const Camera2D *cam); // 3x viewport, centered on camera
 ```
 
 ```
-┌────────────────────────────┐
-│      logic bounds (3x)     │
-│   ┌──────────────────┐     │
-│   │                  │     │
-│   │   viewport (1x)  │     │
-│   |                  │     │
-│   └──────────────────┘     │
-│                            │
-└────────────────────────────┘
+┌─────────────────────────────────────────────┐
+│             logic bounds (3x)               │
+│   ┌─────────────────────────────────────┐   │
+│   │                                     │   │
+│   │         viewport (1x)               │   │
+│   │                                     │   │
+│   └─────────────────────────────────────┘   │
+│                                             │
+└─────────────────────────────────────────────┘
 ```
 
 Entities outside the viewport are not rendered.
@@ -168,7 +195,7 @@ removed or respawned. No coordinate accumulation, no silent state corruption.
 │ A │ D │  Move            │ Space │  Fire active weapon
 └───┴───┘                 └───────┘
   ┌───┐
-  │ S │  Crouch ( exclusively while on ground) / Aim Down (exclusively while on air)
+  │ S │  Crouch (ground) / Aim Down (air)
   └───┘
 ```
 
@@ -195,11 +222,7 @@ gcc main.c scenes/game.c scenes/level_loader.c scenes/camera.c \
     entities/bullet.c entities/collision.c entities/drop.c \
     -o platformer -lraylib -lm
 
-# Debug - enables HUD overlays and AI state rendering
-gcc -DDEBUG main.c scenes/game.c scenes/level_loader.c scenes/camera.c \
-    entities/player.c entities/runner.c entities/box.c \
-    entities/bullet.c entities/collision.c entities/drop.c \
-    -o platformer -lraylib -lm
+# Debug: Add -DDEBUG right after gcc - enables HUD overlays and AI state rendering
 ```
 
 `-DDEBUG` activates:

@@ -2,10 +2,11 @@
 #pragma once
 #include <raylib.h>
 #include "player.h"
+#include "../defines.h"
 
-#define RUNNER_DETECT_RANGE  200.0f
+#define RUNNER_DETECT_RANGE  (TILE_SIZE * 5.0f)
 #define RUNNER_MEMORY_TIME   100.0f
-#define RUNNER_SPEED         100.0f
+#define RUNNER_SPEED         (TILE_SIZE * 2.5f)
 
 // Represents a patrolling enemy entity
 typedef struct {

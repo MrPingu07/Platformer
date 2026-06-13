@@ -1,10 +1,9 @@
 // scenes/level_loader.c
 #include "level_loader.h"
 #include "../entities/runner.h"
+#include "../defines.h"
 #include <raylib.h>
 #include <stdio.h>
-
-#define TILE_SIZE 40.0f
 
 static int GRID_COLS = 0;
 static int GRID_ROWS = 0;
@@ -78,7 +77,7 @@ LevelData load_level(const char *filename) {
                     data.boxes[data.boxCount++] = box_init(posX, posY);
                 }
                 break;
-            case 'E':
+            case 'R':
                 if (data.runnerCount < MAX_RUNNERS) {
                     data.runners[data.runnerCount++] = runner_init(posX, posY, RUNNER_SPEED);
                 }

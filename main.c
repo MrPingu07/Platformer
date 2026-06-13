@@ -5,8 +5,8 @@
 
 int main(void) {
     // Window configuration
-    const int screenWidth = 640;
-    const int screenHeight = 480;
+    const int screenWidth = 1280;
+    const int screenHeight = 720;
     InitWindow(screenWidth, screenHeight, "Prototype");
     SetTargetFPS(60);
 

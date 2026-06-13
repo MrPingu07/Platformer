@@ -1,52 +1,55 @@
 // scenes/camera.c
 #include "camera.h"
+#include "../defines.h"
 
-#define DEADZONE_LEFT   280.0f
-#define DEADZONE_RIGHT  310.0f
-#define DEADZONE_TOP    180.0f
-#define DEADZONE_BOTTOM 300.0f
 #define CAMERA_LERP     6.0f
 
 void camera_init(Camera2D *cam, Vector2 playerCenter) {
     cam->target   = playerCenter;
-    cam->offset   = (Vector2){ 640.0f / 2.0f, 480.0f / 2.0f };
+    cam->offset = (Vector2){ GetScreenWidth() / 2.0f, GetScreenHeight() / 2.0f };
     cam->rotation = 0.0f;
-    cam->zoom     = 1.0f;
+    cam->zoom = 40.0f / TILE_SIZE;
 }
 
 void camera_update(Camera2D *cam, Vector2 playerCenter, int levelWidth, int levelHeight, float dt) {
-    float playerScreenX = playerCenter.x - cam->target.x + cam->offset.x;
+    float screenW = cam->offset.x * 2.0f;
+    float screenH = cam->offset.y * 2.0f;
+    float deadzoneLeft   = screenW * 0.48f;
+    float deadzoneRight  = screenW * 0.52f;
+    float deadzoneTop    = screenH * 0.48f;
+    float deadzoneBottom = screenH * 0.52f;
+
+    float playerScreenX = (playerCenter.x - cam->target.x) * cam->zoom + cam->offset.x;
     float targetX = cam->target.x;
-    if (playerScreenX < DEADZONE_LEFT)  targetX += (playerScreenX - DEADZONE_LEFT);
-    if (playerScreenX > DEADZONE_RIGHT) targetX += (playerScreenX - DEADZONE_RIGHT);
+    if (playerScreenX < deadzoneLeft)  targetX += (playerScreenX - deadzoneLeft)  / cam->zoom;
+    if (playerScreenX > deadzoneRight) targetX += (playerScreenX - deadzoneRight) / cam->zoom;
     cam->target.x += (targetX - cam->target.x) * CAMERA_LERP * dt;
 
-    float playerScreenY = playerCenter.y - cam->target.y + cam->offset.y;
+    float playerScreenY = (playerCenter.y - cam->target.y) * cam->zoom + cam->offset.y;
     float targetY = cam->target.y;
-    if (playerScreenY < DEADZONE_TOP)    targetY += (playerScreenY - DEADZONE_TOP);
-    if (playerScreenY > DEADZONE_BOTTOM) targetY += (playerScreenY - DEADZONE_BOTTOM);
+    if (playerScreenY < deadzoneTop)    targetY += (playerScreenY - deadzoneTop)    / cam->zoom;
+    if (playerScreenY > deadzoneBottom) targetY += (playerScreenY - deadzoneBottom) / cam->zoom;
     cam->target.y += (targetY - cam->target.y) * CAMERA_LERP * dt;
 
-    float halfW = 640.0f / 2.0f;
-    float halfH = 480.0f / 2.0f;
+    float halfW = cam->offset.x / cam->zoom;
+    float halfH = cam->offset.y / cam->zoom;
     if (cam->target.x < halfW)               cam->target.x = halfW;
     if (cam->target.x > levelWidth  - halfW) cam->target.x = levelWidth  - halfW;
-    if (cam->target.y < halfH)               cam->target.y = halfH;
     if (cam->target.y > levelHeight - halfH) cam->target.y = levelHeight - halfH;
 }
 
 Rectangle camera_get_viewport(const Camera2D *cam) {
     return (Rectangle){
-        cam->target.x - cam->offset.x,
-        cam->target.y - cam->offset.y,
-        cam->offset.x * 2.0f,
-        cam->offset.y * 2.0f
+        cam->target.x - cam->offset.x / cam->zoom,
+        cam->target.y - cam->offset.y / cam->zoom,
+        cam->offset.x * 2.0f / cam->zoom,
+        cam->offset.y * 2.0f / cam->zoom
     };
 }
 
 Rectangle camera_get_logic_bounds(const Camera2D *cam) {
-    float w = cam->offset.x * 2.0f * 3.0f;
-    float h = cam->offset.y * 2.0f * 3.0f;
+    float w = (cam->offset.x * 2.0f / cam->zoom) * 3.0f;
+    float h = (cam->offset.y * 2.0f / cam->zoom) * 3.0f;
     return (Rectangle){
         cam->target.x - w / 2.0f,
         cam->target.y - h / 2.0f,

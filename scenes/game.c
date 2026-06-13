@@ -123,7 +123,6 @@ static void game_update(float dt) {
     for (int i = 0; i < boxCount; i++) box_update(&boxes[i], &player);
 
     camera_update(&camera, (Vector2){ player.x + 20.0f, player.y + 20.0f }, levelWidth, levelHeight, dt);
-
 }
 
 // --- Scene Lifecycle: Render ---
@@ -159,6 +158,7 @@ static void game_render(void) {
     Weapon currentWeapon = player.inventory[player.currentSlot];
     DrawText(TextFormat("WEAPON: %s", currentWeapon.name), 20, 20, 20, RAYWHITE);
     DrawText("A/D: Move  W: Jump  SPACE: Fire  Q: Swap", 20, 450, 10, LIGHTGRAY);
+
     //DEBUG
     #ifdef DEBUG
     Rectangle logicBounds = camera_get_logic_bounds(&camera);
