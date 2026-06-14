@@ -5,7 +5,7 @@
 #include "../defines.h"
 
 #define RUNNER_DETECT_RANGE  (TILE_SIZE * 5.0f)
-#define RUNNER_MEMORY_TIME   100.0f
+#define RUNNER_MEMORY_TIME   10.0f
 #define RUNNER_SPEED         (TILE_SIZE * 2.5f)
 
 // Represents a patrolling enemy entity

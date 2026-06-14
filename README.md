@@ -3,7 +3,7 @@
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  640×480 px  │  25px/tile  │  C99  │  Raylib 6.0        │
+│  1280×720 px  │  25px/tile  │  C99  │  Raylib           │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -19,55 +19,101 @@
 .
 ├── assets/
 │   └── levels/
-│       └── level1.txt           # Plain-text spatial matrix
+│       ├── level1.txt
+│       └── level2.txt
 ├── entities/
-│   ├── box.c / .h               # Breakable obstacles + bounce physics
-│   ├── bullet.c / .h            # Projectile pool + polymorphic weapon profiles
-│   ├── collision.c / .h         # Environment, rect, and hittable resolution
-│   ├── drop.c / .h              # Weapon drop physics, probability, collection
-│   ├── hittable.h               # Generic damageable entity interface
-│   ├── player.c / .h            # Physics, movement, aim system, inventory
-│   └── runner.c / .h            # Patrol AI, detection, memory, aggro states
+│   ├── box.c / .h
+│   ├── bullet.c / .h
+│   ├── collision.c / .h
+│   ├── drop.c / .h
+│   ├── hittable.h
+│   ├── player.c / .h
+│   └── runner.c / .h
 ├── scenes/
-│   ├── camera.c / .h            # Deadzone tracking, lerp, level clamp, culling rects
-│   ├── level_loader.c / .h      # Tilemap parser - returns LevelData struct
-│   └── game.c / .h              # Scene coordinator - init, update, render
-├── defines.h                    # Global constants - TILE_SIZE, TILE_SCREEN_SIZE, shared defines
-├── scene.h                      # Scene interface (Update/Render fn ptrs)
-├── ROADMAP.md                   # Feature backlog and priorities
-└── main.c                       # Entry point - window + lifecycle
+│   ├── camera.c / .h
+│   ├── game.c / .h
+│   ├── level_loader.c / .h
+│   ├── menu.c / .h
+│   ├── moving_platform.c / .h
+├── defines.h
+├── scene.h
+├── scene_manager.c / .h
+├── ROADMAP.md
+└── main.c
 ```
 
 ---
 
 ## Architecture
 
+### Scene Manager
+
+A minimal scene dispatcher. No registry, no stack.
+
+```c
+scene_manager_set(menu_scene());   // switch to any scene
+scene_manager_update(dt);
+scene_manager_render();
+```
+
+`main.c` boots into `menu_scene()`. Any scene can transition to any other via `scene_manager_set`.
+
 ### Data-Driven Level Loading
 
-Levels are plain-text `.txt` tile matrices parsed at runtime by `level_loader.c`.
-No entity is hardcoded. Swap the file, get a new world.
+Levels are plain-text `.txt` files with an optional metadata header followed by a tile grid.
 
+```
+tileset=cave
+exit:0=level2.txt
+exit:1=level3.txt
+moving:0=10,0,3,0.5,0.5,9
+---
+....P....
+88888888.
+=........
+```
+
+Header lines are `key=value` pairs. The separator `---` marks the start of the grid.
 `load_level()` returns a self-contained `LevelData` struct. The scene unpacks it.
 The loader has zero knowledge of what the scene does with the data.
 
-```c
-LevelData data = load_level("assets/levels/level1.txt");
-// platforms, runners, boxes, player spawn - all derived from the tile matrix
-```
-
-Tile token dictionary:
+**Tile token dictionary:**
 
 ```
-┌───────┬─────────────────────┬──────────────────────────────────────┐
-│ Token │ Entity              │ Description                          │
-├───────┼─────────────────────┼──────────────────────────────────────┤
-│   .   │ Air                 │ Passable buffer - no allocation      │
-│   P   │ Player Spawn        │ Initial origin vector                │
-│  # =  │ Solid Geometry      │ Static platforms and boundaries      │
-│   B   │ Destructible Box    │ Stomp-bounce breakable obstacle      │
-│   R   │ Runner              │ Patrolling hazard entity             │
-└───────┴─────────────────────┴──────────────────────────────────────┘
+┌───────┬──────────────────────┬──────────────────────────────────────┐
+│ Token │ Entity               │ Description                          │
+├───────┼──────────────────────┼──────────────────────────────────────┤
+│   .   │ Air                  │ Passable - no allocation             │
+│   P   │ Player Spawn         │ Initial origin vector                │
+│ 1-9   │ Solid Geometry       │ Directional tile variants (numpad)   │
+│   =   │ Isolated Tile        │ Solid tile, no neighbors assumed     │
+│   B   │ Destructible Box     │ Stomp-bounce breakable obstacle      │
+│   R   │ Runner               │ Patrolling hazard entity             │
+│   M   │ Moving Platform      │ Spawn position; path from header     │
+│   E   │ Exit Tile            │ Level transition trigger             │
+└───────┴──────────────────────┴──────────────────────────────────────┘
 ```
+
+**Numpad tile layout (maps to spritesheet index):**
+
+```
+7 8 9      ↖ ↑ ↗
+4 5 6  →   ← # →
+1 2 3      ↙ ↓ ↘
+=          isolated
+```
+
+**Header key reference:**
+
+```
+tileset=<name>                            Tileset folder name
+exit:N=<filename>                         Nth exit destination
+moving:N=dx,dy,speed,accel,decel,sprite   Nth moving platform — offset in tiles from spawn
+```
+
+`M` tokens in the grid are matched to `moving:N` entries by parse order.
+`dx` and `dy` are signed tile offsets from the `M` position in the grid.
+A `M` with no corresponding header entry becomes a static tile with `spriteIndex=9`.
 
 ### Module Isolation
 
@@ -76,86 +122,59 @@ Nothing reaches across module boundaries without an explicit interface.
 
 `runner.c` has no knowledge of level geometry - it receives platform arrays as parameters.
 `collision.c` has no knowledge of entity types - it operates on `Rectangle` and `Hittable`.
-`drop.c` handles probability, physics, and collection internally - `game.c` calls one function.
+`drop.c` handles probability, physics, and collection internally.
 
 ### TILE_SIZE - Single Source of Truth
 
 All world-space dimensions, velocities, forces, and entity sizes derive from `TILE_SIZE`
-defined in `defines.h`. Changing one value rescales the entire simulation.
+defined in `defines.h`.
 
 ```c
-// defines.h
-#define TILE_SIZE        25.0f
-#define TILE_SCREEN_SIZE 40.0f
-
+#define TILE_SIZE   25.0f
 // Everything else is a ratio
-#define MOVE_SPEED   (TILE_SIZE * 7.5f)
-#define GRAVITY      (TILE_SIZE * 20.0f)
-#define RUNNER_SPEED (TILE_SIZE * 2.5f)
+#define MOVE_SPEED  (TILE_SIZE * 7.5f)
+#define GRAVITY     (TILE_SIZE * 20.0f)
 ```
 
-Camera zoom is derived from `TILE_SCREEN_SIZE / TILE_SIZE`, keeping the visual footprint
-of the player constant regardless of `TILE_SIZE`:
-
-```c
-cam->zoom = TILE_SCREEN_SIZE / TILE_SIZE;
-```
-
-`TILE_SIZE` controls simulation granularity. `TILE_SCREEN_SIZE` controls visual scale.
-Both are independent.
+Camera zoom is derived at init time: `cam->zoom = 40.0f / TILE_SIZE`.
+Viewport tile count is therefore constant regardless of `TILE_SIZE` value.
 
 ### Polymorphic Weapon Dispatch
 
-Weapons bind a `fireFunc` callback at creation time. The fire path is identical for all four profiles - no branching in the game loop.
+Weapons bind a `fireFunc` callback at creation time.
 
 ```c
-// Bound at load time, dispatched at runtime
 currentWeapon->fireFunc(fireOrigin, aimDir, bullets, maxBullets);
 ```
 
 ### Runner AI
 
-Runners operate across four states driven by detection range and memory timers.
-
 ```
 PATROL → FREEZE (1s) → AGGRO → MEMORY (last known position) → PATROL
 ```
 
-Detection range doubles on entering AGGRO. Memory persists for `RUNNER_MEMORY_TIME` seconds
-after losing sight. Runners respect gravity, check edges before patrolling off platforms,
-and jump toward targets on higher ground.
+Detection range doubles on AGGRO. Runners respect gravity, check edges, and jump toward elevated targets.
+
+### Moving Platforms
+
+Ping-pong lerp between spawn position and an offset target, with independent accel/decel ramps.
+`tVelocity` is modulated per frame against a trapezoidal velocity profile.
+Rider logic: `Player.groundPlatformIndex` tracks which platform tile the player is standing on.
+Delta is applied at the start of the next frame before physics integration.
 
 ### Culling System
 
-Two rectangular regions are computed every frame from the active `Camera2D` in `camera.c`.
-Both regions operate in world-space and are available to any scene.
-
 ```c
-Rectangle camera_get_viewport(const Camera2D *cam);     // Exact screen bounds in world-space
-Rectangle camera_get_logic_bounds(const Camera2D *cam); // 3x viewport, centered on camera
+Rectangle camera_get_viewport(const Camera2D *cam);
+Rectangle camera_get_logic_bounds(const Camera2D *cam);
 ```
 
-```
-┌─────────────────────────────────────────────┐
-│             logic bounds (3x)               │
-│   ┌─────────────────────────────────────┐   │
-│   │                                     │   │
-│   │         viewport (1x)               │   │
-│   │                                     │   │
-│   └─────────────────────────────────────┘   │
-│                                             │
-└─────────────────────────────────────────────┘
-```
-
-Entities outside the viewport are not rendered.
-Entities outside the logic bounds skip their update entirely - AI, physics, collision.
-Entities inside the logic bounds but outside the viewport update normally, giving the
-impression that the world keeps running just beyond the player's view.
+Entities outside viewport are not rendered.
+Entities outside logic bounds (3x viewport) skip update entirely.
 
 ### Weapon Drop System
 
-Runners have a base 5% drop chance on death, increasing by 1% per kill and capping at 80%.
-Drop type is weighted:
+Base 5% drop chance on runner death, +1% per kill, capped at 80%.
 
 | Weapon       | Weight |
 |--------------|--------|
@@ -163,14 +182,9 @@ Drop type is weighted:
 | Full-Auto    | 50     |
 | Flamethrower | 25     |
 
-Drops arc from the runner's position, land on platforms, and wait for collection.
-The player starts with Semi-Auto only. The second inventory slot is locked until a
-drop is collected. On death, the player respawns with the initial loadout.
-
 ### Kill Volume
 
-Any entity - player, runner, or drop - that falls below `levelHeight` is immediately
-removed or respawned. No coordinate accumulation, no silent state corruption.
+Any entity below `levelHeight` is immediately removed or respawned.
 
 ---
 
@@ -206,8 +220,8 @@ removed or respawned. No coordinate accumulation, no silent state corruption.
 All instance arrays are statically bounded. No heap allocation at runtime.
 
 ```
-platforms[2048]   boxes[2048]   runners[2048]   bulletPool[100]   drops[32]
-      ↓                ↓              ↓                ↓               ↓
+platforms[2048]   boxes[2048]   runners[2048]   bulletPool[100]   drops[32]   movingPlatforms[64]
+      ↓                ↓              ↓                ↓               ↓               ↓
 [ deterministic bounds - zero heap growth during gameplay ]
 ```
 
@@ -217,18 +231,23 @@ platforms[2048]   boxes[2048]   runners[2048]   bulletPool[100]   drops[32]
 
 ```bash
 # Release
-gcc main.c scenes/game.c scenes/level_loader.c scenes/camera.c \
+gcc main.c scene_manager.c scenes/game.c scenes/menu.c scenes/level_loader.c scenes/camera.c scenes/moving_platform.c \
     entities/player.c entities/runner.c entities/box.c \
     entities/bullet.c entities/collision.c entities/drop.c \
     -o platformer -lraylib -lm
 
-# Debug: Add -DDEBUG right after gcc - enables HUD overlays and AI state rendering
+# Debug
+gcc -DDEBUG main.c scene_manager.c scenes/game.c scenes/menu.c scenes/level_loader.c scenes/camera.c scenes/moving_platform.c \
+    entities/player.c entities/runner.c entities/box.c \
+    entities/bullet.c entities/collision.c entities/drop.c \
+    -o platformer -lraylib -lm
 ```
 
 `-DDEBUG` activates:
 - Runner state overlay (PATROL / FREEZE / AGGRO / MEMORY + HP)
 - Edge raycast and detection range visualization
 - Culling HUD: runners rendered vs logic-active vs total
+- Level metadata HUD: tileset, exits, moving platform count
 
 > Dependencies: [Raylib](https://www.raylib.com/)
 

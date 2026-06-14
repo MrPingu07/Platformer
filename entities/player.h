@@ -23,6 +23,7 @@ typedef struct {
     // Aiming & crouch state
     Vector2 aimDir;   // Normalized direction vector for current aim
     bool isCrouching;
+    int  groundPlatformIndex;
 
     // Combat & Inventory system
     Weapon inventory[2]; // Two available weapon slots

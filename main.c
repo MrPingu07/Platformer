@@ -1,7 +1,10 @@
 // main.c
 #include <raylib.h>
+#include "scene_manager.h"
 #include "scene.h"
 #include "scenes/game.h"
+#include "scene_manager.h"
+#include "scenes/menu.h"
 
 int main(void) {
     // Window configuration
@@ -14,12 +17,11 @@ int main(void) {
     Scene currentScene = game_scene();
 
     // Main Game Loop
-    while (!WindowShouldClose()) {
-        // 1. Update scene logic passing Delta Time
-        currentScene.update(GetFrameTime());
+    scene_manager_set(menu_scene());
 
-        // 2. Render the scene
-        currentScene.render();
+    while (!WindowShouldClose()) {
+        scene_manager_update(GetFrameTime());
+        scene_manager_render();
     }
 
     // De-virtualization and cleanup

@@ -16,6 +16,7 @@ void resolve_environment_collisions(Player *p, Rectangle *platforms, int count) 
             p->y = platforms[i].y - playerH - (TILE_SIZE - playerH);
             p->vy = 0;
             p->onGround = true;
+            p->groundPlatformIndex = i;
         }
     }
 }

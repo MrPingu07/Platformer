@@ -12,55 +12,41 @@ _nada actualmente_
 - **Mosquito** — Patrullero volador. Ignora geometría del mundo. Al detectar al jugador carga en patrón errático. Sin gravedad.
 
 ### Escenas
-- **Scene Manager** — Módulo centralizado `scene_manager.c/.h`. Registro de escenas por ID, transición via `scene_manager_goto(int id)`. Las escenas no se conocen entre sí. Sin pila por ahora.
-- **Menú principal** — Primera escena no-gameplay. Prerequisito: Scene Manager.
+- **Scene Manager** — Implementado en forma primitiva (`scene_manager_set`, `update`, `render`). Sin registro por ID ni pila. Expandir cuando haya más escenas que lo justifiquen.
+- **Menú principal** — Implementado: Main (Play / Settings) → Settings (Resolution / Return) → Resolution (lista dummy). Pendiente: conectar resoluciones reales con `SetWindowSize`.
 
 ### Metadata de nivel
-- **Cabecera en `.txt`** — Líneas `clave=valor` antes del grid, separadas por `---`. Parseadas en `LevelData` como campos tipados.
-- **Campos previstos:**
-  - `next=example-level2.txt` — Nivel destino al completar
-  - `music=theme1` — ID de música (futuro)
-  - `tileset=example` — Pack de tiles a usar para este nivel
-- **Exit tile** — Token nuevo en el grid que representa el punto de salida. Activo solo cuando las condiciones de victoria están satisfechas.
+- **Exit tile** — Token `E` en el grid parsea posición y destino. Pendiente: activación condicional (victoria requerida antes de poder usarlo).
 
 ### Sistema de Tilesets
-El designer coloca los tiles manualmente en el `.txt`. El engine no infiere ni calcula vecinos: lo que está en el grid es lo que se renderiza. Sin magia.
+El designer coloca los tiles manualmente en el `.txt`. El engine no infiere vecinos.
 
-**Tokens de geometría sólida:**
+Tokens de geometría sólida (numpad layout):
 ```
-↖ ↑ ↗
-←  #  →      9 variantes direccionales + 1 aislado
-↙ ↓ ↘
-=            Tile aislado — se ve bien sin vecinos
+7 8 9
+4 5 6
+1 2 3
+=
 ```
 
-**Formato del pack:** un spritesheet PNG por tileset, 10 tiles en fila en orden fijo:
+**Formato del pack:** spritesheet PNG por tileset, 10 tiles en fila en orden fijo:
 ```
 ↖ ↑ ↗ ← # → ↙ ↓ ↘ =
+ 0  1  2  3 4  5  6  7  8 9
 ```
-Cada tile ocupa `TILE_SCREEN_SIZE x TILE_SCREEN_SIZE` px. Un solo `LoadTexture()` por nivel, `DrawTextureRec()` por tile en render.
+
+Cada tile ocupa `TILE_SCREEN_SIZE x TILE_SCREEN_SIZE` px. Un solo `LoadTexture()` por nivel.
 
 **Ubicación:** `assets/tilesets/<nombre>/tileset.png`
 
 **Responsabilidades:**
-- `level_loader.c` lee `tileset=example` de la cabecera y lo guarda como string en `LevelData`. Ciego a Raylib, ciego a assets.
-- `game.c` recibe el string, llama a `tileset_load("assets/tilesets/example")` al iniciar la escena y `tileset_unload()` al salir.
-- El renderer de plataformas en `game.c` mapea cada token a su índice en el spritesheet y llama `DrawTextureRec()`.
+- `level_loader.c` lee `tileset=<name>` y lo guarda en `LevelData.tileset`. Ciego a assets.
+- `game.c` recibe el string, carga la textura al iniciar la escena, la libera al salir.
+- El renderer de plataformas mapea `spriteIndex` a `DrawTextureRec()`.
 
-**Prerequisito:** Cabecera de metadata en `.txt`.
+**Prerequisito:** ninguno, `LevelData.tileset` ya existe.
 
 ### Plataformas especiales
-
-**Plataforma móvil**
-- Token `M` en el grid. Posición de spawn únicamente.
-- Path, velocidad, aceleración, deceleración y sprite definidos en la cabecera por índice de aparición:
-  ```
-  moving:0=pathStartX,pathStartY,pathEndX,pathEndY,speed,accel,decel,spriteIndex
-  moving:1=...
-  ```
-- `spriteIndex` apunta a un tile del spritesheet del tileset activo. Sin tokens adicionales en el grid.
-- `Struct: MovingPlatform { rect, velocity, pathStart, pathEnd, t, speed, accel, decel, spriteIndex }`
-- El player resuelve colisión contra ella con `resolve_rect_collision`. Rider logic (player se mueve con la plataforma) es el único añadido no trivial.
 
 **Plataforma rompible**
 - Token `X` en el grid.
@@ -68,33 +54,41 @@ Cada tile ocupa `TILE_SCREEN_SIZE x TILE_SCREEN_SIZE` px. Un solo `LoadTexture()
 - Estados: `IDLE -> SHAKING -> BROKEN`. Respawn opcional por nivel.
 - Colisión desactivada en estado `BROKEN`.
 
-**Prerequisito:** Cabecera de metadata en `.txt`.
-
 ### Sistema de condiciones de victoria
 - Definidas en la metadata del nivel, evaluadas cada frame por `game.c`.
 - Soporte para condiciones AND y OR.
-- **Condiciones previstas:**
-  - `win=kill_all` — Eliminar todos los enemigos del nivel
-  - `win=collect_keys:3` — Recoger N llaves
-  - `win=break_all_boxes` — Romper todas las cajas
-  - `win=reach_exit` — Llegar al tile de salida (A a B simple)
-  - `win=kill_boss` — Eliminar al jefe del nivel
+- Condiciones previstas:
+  - `win=kill_all`
+  - `win=collect_keys:N`
+  - `win=break_all_boxes`
+  - `win=reach_exit`
+  - `win=kill_boss`
+
+### Limpieza pendiente (game.c)
+- Eliminar `static char levelNext[64]` — reliquia, nunca se usa.
+- `runner_update` recibe `platformCount` en vez de `totalPlatforms` — bug silencioso con moving platforms.
+- `GRID_COLS` / `GRID_ROWS` son statics globales en `level_loader.c` — riesgo si el Scene Manager carga niveles en paralelo.
 
 ---
 
 ## Completado
 - Arquitectura base: scene system, módulos ciegos, zero heap
-- `TILE_SIZE` centralizado en `defines.h` — todas las dimensiones, velocidades y fuerzas son ratios de `TILE_SIZE`
-- `TILE_SCREEN_SIZE` separado de `TILE_SIZE` — zoom de cámara independiente de la escala de simulación
-- Culling rectangular en world-space: render (viewport exacto) y lógica (3x viewport)
+- `TILE_SIZE` centralizado — todas las dimensiones son ratios
+- Culling rectangular: render (viewport) y lógica (3x viewport)
 - Player: movimiento, salto, agacharse, sistema de apuntado direccional
-- Runner: patrulla, detección, memoria, aggro, chance de drops al morir
+- Runner: patrulla, detección, memoria, aggro, drops al morir
 - Sistema de armas polimórfico: Semiauto, Shotgun, Full-Auto, Lanzallamas
 - Pool de balas, sistema de drops con física
-- Cámara con deadzone en screen space, lerp, clamp de nivel
-- Level loader data-driven desde `.txt`
-- Arrays escalados a 2048
+- Cámara con deadzone, lerp, clamp de nivel
+- Level loader data-driven desde `.txt` con cabecera de metadata
+- Cabecera: `tileset`, `exit:N`, `moving:N`
+- Tokens de tile: `1-9` (numpad direccional), `=` (aislado), `B`, `R`, `M`, `E`, `P`
+- Transición de niveles via tile `E`
+- Plataformas móviles: ping-pong con accel/decel, formato `dx,dy` relativo al spawn, rider logic
+- Arrays escalados a 2048 (plataformas, boxes, runners)
 - Kill volume para player, runners y drops
-- Flag `-DDEBUG` en compilación para HUD y overlays de debug
+- Flag `-DDEBUG` para HUD y overlays
 - Player respawnea con loadout inicial al morir
-- Drop chance dinámico por kills, topa en 80%
+- Drop chance dinámico por kills, tope en 80%
+- Scene Manager primitivo: `scene_manager_set / update / render`
+- Menú principal: navegación por teclado, Main / Settings / Resolution
