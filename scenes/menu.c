@@ -41,9 +41,11 @@ static void update_settings(void) {
     if (IsKeyPressed(KEY_DOWN)) settingsCursor = (settingsCursor + 1) % settingsCount;
     if (IsKeyPressed(KEY_UP))   settingsCursor = (settingsCursor - 1 + settingsCount) % settingsCount;
 
-    if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_ESCAPE)) {
-        if (settingsCursor == 1 || IsKeyPressed(KEY_ESCAPE)) { state = MENU_MAIN; return; }
+    if (IsKeyPressed(KEY_ESCAPE)) { state = MENU_MAIN; return; }
+
+    if (IsKeyPressed(KEY_ENTER)) {
         if (settingsCursor == 0) { state = MENU_RESOLUTION; resCursor = selectedRes; }
+        if (settingsCursor == 1)   state = MENU_MAIN;
     }
 }
 

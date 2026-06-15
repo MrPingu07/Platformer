@@ -62,9 +62,6 @@ void moving_platform_update(MovingPlatform *mp, float dt) {
     mp->rect.x += mp->delta.x;
     mp->rect.y += mp->delta.y;
 
-    // Interpolar posición
-    mp->rect.x = mp->pathStart.x + (mp->pathEnd.x - mp->pathStart.x) * mp->t;
-    mp->rect.y = mp->pathStart.y + (mp->pathEnd.y - mp->pathStart.y) * mp->t;
 }
 
 void moving_platforms_update(MovingPlatform *platforms, int count, float dt) {

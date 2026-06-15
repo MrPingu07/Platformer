@@ -1,8 +1,6 @@
 // main.c
 #include <raylib.h>
 #include "scene_manager.h"
-#include "scene.h"
-#include "scenes/game.h"
 #include "scene_manager.h"
 #include "scenes/menu.h"
 
@@ -12,9 +10,7 @@ int main(void) {
     const int screenHeight = 720;
     InitWindow(screenWidth, screenHeight, "Prototype");
     SetTargetFPS(60);
-
-    // Initialize the starting scene (Game Scene)
-    Scene currentScene = game_scene();
+    SetExitKey(KEY_NULL);
 
     // Main Game Loop
     scene_manager_set(menu_scene());

@@ -31,6 +31,7 @@ typedef struct {
     int             levelWidth;
     int             levelHeight;
     char            tileset[64];
+    char            winCondition[64];
     ExitTile        exits[MAX_EXITS];
     int             exitCount;
     MovingPlatform  movingPlatforms[MAX_MOVING_PLATFORMS];

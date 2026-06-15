@@ -14,36 +14,24 @@
 #include "moving_platform.h"
 
 typedef struct {
-
     int levelWidth;
     int levelHeight;
-
     Camera2D camera;
-
     Player player;
-
     Runner runners[MAX_RUNNERS];
     int runnerCount;
-
     Box boxes[MAX_BOXES];
     int boxCount;
-
     PlatformTile platforms[MAX_PLATFORMS];
     int platformCount;
-
     Bullet bullets[MAX_BULLETS];
-
     Drop drops[MAX_DROPS];
-
     bool aliveSnapshot[MAX_RUNNERS];
-
     int killCount;
-
     char levelTileset[64];
-
+    char winCondition[64];
     ExitTile exits[MAX_EXITS];
     int exitCount;
-
     MovingPlatform movingPlatforms[MAX_MOVING_PLATFORMS];
     int movingPlatformCount;
 

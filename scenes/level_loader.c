@@ -7,12 +7,12 @@
 #include <stdio.h>
 #include <string.h>
 
-static int GRID_COLS = 0;
-static int GRID_ROWS = 0;
+typedef struct { int cols; int rows; } GridSize;
 
-static void measure_level(const char *filename) {
+static GridSize measure_level(const char *filename) {
+    GridSize size = { 0, 0 };
     FILE *f = fopen(filename, "r");
-    if (!f) return;
+    if (!f) return size;
     char line[4096];
     bool inGrid = false;
     int maxCols = 0, rows = 0;
@@ -28,18 +28,18 @@ static void measure_level(const char *filename) {
         if (len > 0) rows++;
     }
     fclose(f);
-    GRID_COLS = maxCols;
-    GRID_ROWS = rows;
+    size.cols = maxCols;
+    size.rows = rows;
+    return size;
 }
 
 LevelData load_level(const char *filename) {
     LevelData data = { 0 };
     bool playerSpawned = false;
 
-    measure_level(filename);
-
-    data.levelWidth  = GRID_COLS * (int)TILE_SIZE;
-    data.levelHeight = GRID_ROWS * (int)TILE_SIZE;
+    GridSize grid = measure_level(filename);
+    data.levelWidth  = grid.cols * (int)TILE_SIZE;
+    data.levelHeight = grid.rows * (int)TILE_SIZE;
 
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
@@ -47,7 +47,6 @@ LevelData load_level(const char *filename) {
         return data;
     }
 
-    // --- Parseo de cabecera ---
     char line[4096];
     bool inGrid = false;
 
@@ -61,7 +60,6 @@ LevelData load_level(const char *filename) {
             break;
         }
 
-        // Parseo clave=valor
         char *eq = strchr(line, '=');
         if (!eq) continue;
         *eq = '\0';
@@ -69,12 +67,12 @@ LevelData load_level(const char *filename) {
         char *val = eq + 1;
 
         if (strcmp(key, "tileset") == 0) snprintf(data.tileset, sizeof(data.tileset), "%s", val);
+        if (strcmp(key, "win") == 0) snprintf(data.winCondition, sizeof(data.winCondition), "%s", val);
 
         if (strncmp(key, "exit:", 5) == 0) {
             int idx = atoi(key + 5);
-            if (idx >= 0 && idx < MAX_EXITS) {
+            if (idx >= 0 && idx < MAX_EXITS)
                 snprintf(data.exits[idx].destination, 64, "%s", val);
-            }
         }
 
         if (strncmp(key, "moving:", 7) == 0) {
@@ -83,8 +81,8 @@ LevelData load_level(const char *filename) {
                 float dx, dy, speed, accel, decel;
                 int spriteIndex;
                 sscanf(val, "%f,%f,%f,%f,%f,%d", &dx, &dy, &speed, &accel, &decel, &spriteIndex);
-                data.movingPlatforms[idx].pathStart   = (Vector2){ 0.0f, 0.0f }; // se calcula en el fallback post-grid
-                data.movingPlatforms[idx].pathEnd     = (Vector2){ dx * TILE_SIZE, dy * TILE_SIZE }; // offset temporal
+                data.movingPlatforms[idx].pathStart   = (Vector2){ 0.0f, 0.0f };
+                data.movingPlatforms[idx].pathEnd     = (Vector2){ dx * TILE_SIZE, dy * TILE_SIZE };
                 data.movingPlatforms[idx].speed       = speed;
                 data.movingPlatforms[idx].accel       = accel;
                 data.movingPlatforms[idx].decel       = decel;
@@ -94,18 +92,16 @@ LevelData load_level(const char *filename) {
                 data.movingPlatforms[idx].tDirection  = 1;
             }
         }
-
     }
 
-    // --- Parseo del grid ---
     int row = 0;
-    while (row < GRID_ROWS && fgets(line, sizeof(line), file)) {
+    while (row < grid.rows && fgets(line, sizeof(line), file)) {
         int len = 0;
         while (line[len] && line[len] != '\r' && line[len] != '\n') len++;
 
         int col = 0;
         int i = 0;
-        while (i < len && col < GRID_COLS) {
+        while (i < len && col < grid.cols) {
             unsigned char ch = (unsigned char)line[i];
             float posX = col * TILE_SIZE;
             float posY = row * TILE_SIZE;
@@ -166,14 +162,13 @@ LevelData load_level(const char *filename) {
     if (!playerSpawned)
         data.player = player_init(0.0f, 0.0f);
 
-    //Fallback for M if lack of parameters
     for (int i = 0; i < data.movingPlatformCount; i++) {
         MovingPlatform *mp = &data.movingPlatforms[i];
         mp->pathStart = (Vector2){ mp->rect.x, mp->rect.y };
         bool noPath = (mp->pathEnd.x == 0.0f && mp->pathEnd.y == 0.0f);
         if (noPath) {
-            mp->pathEnd = mp->pathStart; // sin header: estática
-            mp->speed   = 0.0f;
+            mp->pathEnd     = mp->pathStart;
+            mp->speed       = 0.0f;
             mp->spriteIndex = 9;
         } else {
             mp->pathEnd.x += mp->rect.x;
