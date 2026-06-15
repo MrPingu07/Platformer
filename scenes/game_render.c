@@ -35,7 +35,7 @@ void game_render_world(GameState *game) {
         if (strcmp(game->winCondition, "kill_all") == 0)
             for (int j = 0; j < game->runnerCount; j++)
                 if (!game->runners[j].isDead) { conditionMet = false; break; }
-                DrawRectangleRec(game->exits[i].rect, conditionMet ? WHITE : RED);
+                DrawRectangleRec(game->exits[i].rect, conditionMet ? WHITE : BLACK);
     }
 
     player_render(&game->player);

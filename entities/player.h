@@ -6,7 +6,7 @@
 #include "../defines.h"
 
 #define MOVE_SPEED       (TILE_SIZE * 7.5f)
-#define ACCELERATION     (TILE_SIZE * 45.0f)
+#define ACCELERATION     (TILE_SIZE * 50.0f)
 #define AIR_ACCELERATION (TILE_SIZE * 10.0f)
 #define FRICTION         (TILE_SIZE * 35.0f)
 #define AIR_FRICTION     (TILE_SIZE * 7.5f)
