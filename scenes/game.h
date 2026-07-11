@@ -3,5 +3,5 @@
 
 #include "../scene.h"
 
-// Factory function that initializes and returns the gameplay scene instance
 Scene game_scene(void);
+Scene game_scene_from(const char *levelFile);

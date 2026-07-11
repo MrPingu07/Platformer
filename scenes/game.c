@@ -32,3 +32,8 @@ Scene game_scene(void) {
     game_init("level1.txt");
     return (Scene){ game_update, game_render };
 }
+
+Scene game_scene_from(const char *levelFile) {
+    game_init(levelFile);
+    return (Scene){ game_update, game_render };
+}

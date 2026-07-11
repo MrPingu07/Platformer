@@ -3,6 +3,7 @@
 #include "scene_manager.h"
 #include "scene_manager.h"
 #include "scenes/menu.h"
+#include "scenes/resolution.h"
 
 int main(void) {
     // Window configuration
@@ -11,6 +12,8 @@ int main(void) {
     InitWindow(screenWidth, screenHeight, "Prototype");
     SetTargetFPS(60);
     SetExitKey(KEY_NULL);
+
+    resolution_init();
 
     // Main Game Loop
     scene_manager_set(menu_scene());

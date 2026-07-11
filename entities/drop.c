@@ -5,7 +5,7 @@
 #include <raylib.h>
 
 #define DROP_GRAVITY 800.0f
-#define DROP_SIZE    (TILE_SIZE * 2.0f)
+#define DROP_SIZE    (TILE_SIZE * 1.0f)
 
 static WeaponType roll_weapon_type(void) {
     int roll = GetRandomValue(1, 150);
