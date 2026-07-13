@@ -89,7 +89,7 @@ const char *game_update_world(GameState *game, float dt) {
             if (strcmp(game->winCondition, "kill_all") == 0) {
                 conditionMet = true;
                 for (int j = 0; j < game->runnerCount; j++)
-                    if (!game->runners[j].isDead == false) { conditionMet = false; break; }
+                    if (!game->runners[j].isDead) { conditionMet = false; break; }
             }
             if (conditionMet)
                 return game->exits[i].destination;
