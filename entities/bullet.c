@@ -64,7 +64,7 @@ static void fire_flamethrower(Vector2 origin, Vector2 aimDir, Bullet* bullets, i
         aimDir.x * speed + perp.x * spread,
         aimDir.y * speed + perp.y * spread
     };
-    float randomSize = TILE_SIZE * (float)GetRandomValue(6, 12) * 0.1f;
+    float randomSize = TILE_SIZE * (float)GetRandomValue(15, 35) * 0.01f;
     spawn_bullet(bullets, max, origin, vel, randomSize, 5.0f, 0.8f, RED);
 }
 
