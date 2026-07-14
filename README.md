@@ -2,9 +2,9 @@
 ### C + Raylib - Modular, drop-in, zero heap growth
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│  1280×720 px  │  25px/tile  │  C99  │  Raylib           │
-└─────────────────────────────────────────────────────────┘
+┌─────────────────────────────┐
+│  C99  │  Raylib  │  256×240 │
+└─────────────────────────────┘
 ```
 
 > A 2D platformer built on strict separation of concerns.
@@ -32,9 +32,15 @@
 ├── scenes/
 │   ├── camera.c / .h
 │   ├── game.c / .h
+│   ├── game_init.c / .h
+│   ├── game_render.c / .h
+│   ├── game_state.h
+│   ├── game_update.c / .h
 │   ├── level_loader.c / .h
+│   ├── level_select.c / .h
 │   ├── menu.c / .h
 │   ├── moving_platform.c / .h
+│   ├── resolution.c / .h
 ├── defines.h
 ├── scene.h
 ├── scene_manager.c / .h
@@ -51,7 +57,7 @@
 A minimal scene dispatcher. No registry, no stack.
 
 ```c
-scene_manager_set(menu_scene());   // switch to any scene
+scene_manager_set(menu_scene());
 scene_manager_update(dt);
 scene_manager_render();
 ```
@@ -64,8 +70,8 @@ Levels are plain-text `.txt` files with an optional metadata header followed by 
 
 ```
 tileset=cave
+win=kill_all
 exit:0=level2.txt
-exit:1=level3.txt
 moving:0=10,0,3,0.5,0.5,9
 ---
 ....P....
@@ -107,22 +113,60 @@ The loader has zero knowledge of what the scene does with the data.
 
 ```
 tileset=<name>                            Tileset folder name
+win=<condition>                           Victory condition
 exit:N=<filename>                         Nth exit destination
-moving:N=dx,dy,speed,accel,decel,sprite   Nth moving platform — offset in tiles from spawn
+moving:N=dx,dy,speed,accel,decel,sprite   Nth moving platform
 ```
 
 `M` tokens in the grid are matched to `moving:N` entries by parse order.
 `dx` and `dy` are signed tile offsets from the `M` position in the grid.
 A `M` with no corresponding header entry becomes a static tile with `spriteIndex=9`.
 
+### Resolution System
+
+The game renders at a fixed internal resolution of **256×240** (NES-style).
+Window size is a multiple of that base that fits the monitor.
+
+**Aspect ratios** change how much world is visible horizontally. The camera
+and level boundaries are unaffected; wider ratios simply reveal more background.
+
+```
+4:3  →  320×240
+3:2  →  360×240
+16:9 →  426×240
+21:9 →  560×240
+32:9 →  853×240
+```
+
+**Window modes:** Windowed (integer scale), Borderless, Fullscreen.
+Configured via Settings → Resolution in the main menu. Applied immediately on ENTER.
+
+### Level Select
+
+`level_select_scene()` scans `assets/levels/` for `.txt` files at entry,
+sorts them alphabetically, and displays them in a paged list (`LEVELS_PER_PAGE = 8`).
+Memory is cleared both on selection (before the level loads) and on ESC (before
+returning to the menu). No heap involved.
+
 ### Module Isolation
 
 Each system owns its logic completely. `game.c` passes pointers and receives results.
 Nothing reaches across module boundaries without an explicit interface.
 
-`runner.c` has no knowledge of level geometry - it receives platform arrays as parameters.
-`collision.c` has no knowledge of entity types - it operates on `Rectangle` and `Hittable`.
+`runner.c` has no knowledge of level geometry. It receives platform arrays as parameters.
+`collision.c` has no knowledge of entity types. It operates on `Rectangle` and `Hittable`.
 `drop.c` handles probability, physics, and collection internally.
+
+### game.c Submodules
+
+`game.c` was refactored into four focused files:
+
+```
+game_state.h    Shared GameState struct
+game_init.c     World setup from LevelData
+game_update.c   Per-frame logic, physics, transitions
+game_render.c   Draw calls, HUD, debug overlays
+```
 
 ### TILE_SIZE - Single Source of Truth
 
@@ -131,13 +175,48 @@ defined in `defines.h`.
 
 ```c
 #define TILE_SIZE   25.0f
-// Everything else is a ratio
 #define MOVE_SPEED  (TILE_SIZE * 7.5f)
 #define GRAVITY     (TILE_SIZE * 20.0f)
 ```
 
 Camera zoom is derived at init time: `cam->zoom = 40.0f / TILE_SIZE`.
 Viewport tile count is therefore constant regardless of `TILE_SIZE` value.
+
+### Physics Pipeline (Player)
+
+Player physics are resolved in explicit axis-separated steps each frame:
+
+```
+player_handle_input()                input → vx, vy (jump), isCrouching
+player_integrate_x()                 p->x += vx * dt
+player_apply_gravity()               vy += GRAVITY * dt
+prevY = p->y
+player_integrate_y()                 p->y += vy * dt
+resolve_environment_collisions()     one-way vertical (static platforms, uses prevY)
+resolve_moving_platform_collisions() vertical (moving platforms, margin-based)
+resolve_horizontal_collisions()      lateral walls (neighbor-aware, exposed faces only)
+```
+
+Separating X and Y integration eliminates diagonal tunneling artifacts and allows
+per-axis collision rules without ambiguity.
+
+### Collision Model
+
+Tiles are **one-way from above**: the player can pass through from below and land
+from above, using `prevY` to detect entry direction.
+
+Horizontal collision only blocks on **exposed faces** - a tile checks its neighbors
+in the same row at load-resolve time; if an adjacent tile shares that side, the wall
+is skipped. Contiguous rows of tiles behave as a single seamless surface rather than
+a grid of individual walls.
+
+Static and moving platforms use separate resolution functions because moving
+platforms require a margin-based approach immune to frame-rate-dependent position deltas.
+
+**Known issue:** horizontal wall resolution can pin the player's horizontal input
+while airborne and in contact with a lateral wall, since air acceleration may be too
+low to escape the contact zone before the next frame re-triggers correction. Tracked
+in ROADMAP.
 
 ### Polymorphic Weapon Dispatch
 
@@ -153,14 +232,16 @@ currentWeapon->fireFunc(fireOrigin, aimDir, bullets, maxBullets);
 PATROL → FREEZE (1s) → AGGRO → MEMORY (last known position) → PATROL
 ```
 
-Detection range doubles on AGGRO. Runners respect gravity, check edges, and jump toward elevated targets.
+Detection range doubles on AGGRO. Runners respect gravity, check edges,
+and jump toward elevated targets.
 
 ### Moving Platforms
 
-Ping-pong lerp between spawn position and an offset target, with independent accel/decel ramps.
-`tVelocity` is modulated per frame against a trapezoidal velocity profile.
-Rider logic: `Player.groundPlatformIndex` tracks which platform tile the player is standing on.
-Delta is applied at the start of the next frame before physics integration.
+Ping-pong lerp between spawn position and an offset target, with independent
+accel/decel ramps. `tVelocity` is modulated per frame against a trapezoidal
+velocity profile. Rider logic: `Player.groundPlatformIndex` tracks which platform
+the player is standing on. Delta is applied at the start of the next frame before
+physics integration.
 
 ### Culling System
 
@@ -225,19 +306,27 @@ platforms[2048]   boxes[2048]   runners[2048]   bulletPool[100]   drops[32]   mo
 [ deterministic bounds - zero heap growth during gameplay ]
 ```
 
+Level name list (level select): `char[256][64]`, static, cleared on exit.
+
 ---
 
 ## Build
 
 ```bash
 # Release
-gcc main.c scene_manager.c scenes/game.c scenes/menu.c scenes/level_loader.c scenes/camera.c scenes/moving_platform.c \
+gcc main.c scene_manager.c \
+    scenes/game.c scenes/game_init.c scenes/game_update.c scenes/game_render.c \
+    scenes/menu.c scenes/level_loader.c scenes/camera.c scenes/moving_platform.c \
+    scenes/level_select.c scenes/resolution.c \
     entities/player.c entities/runner.c entities/box.c \
     entities/bullet.c entities/collision.c entities/drop.c \
     -o platformer -lraylib -lm
 
 # Debug
-gcc -DDEBUG main.c scene_manager.c scenes/game.c scenes/menu.c scenes/level_loader.c scenes/camera.c scenes/moving_platform.c \
+gcc -DDEBUG main.c scene_manager.c \
+    scenes/game.c scenes/game_init.c scenes/game_update.c scenes/game_render.c \
+    scenes/menu.c scenes/level_loader.c scenes/camera.c scenes/moving_platform.c \
+    scenes/level_select.c scenes/resolution.c \
     entities/player.c entities/runner.c entities/box.c \
     entities/bullet.c entities/collision.c entities/drop.c \
     -o platformer -lraylib -lm
@@ -247,7 +336,7 @@ gcc -DDEBUG main.c scene_manager.c scenes/game.c scenes/menu.c scenes/level_load
 - Runner state overlay (PATROL / FREEZE / AGGRO / MEMORY + HP)
 - Edge raycast and detection range visualization
 - Culling HUD: runners rendered vs logic-active vs total
-- Level metadata HUD: tileset, exits, moving platform count
+- Level metadata HUD: tileset, win condition
 
 > Dependencies: [Raylib](https://www.raylib.com/)
 

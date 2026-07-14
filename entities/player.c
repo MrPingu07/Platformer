@@ -11,6 +11,7 @@ Player player_init(float x, float y) {
     Player p = {x, y, 0, false, 1};
     p.spawnX = x;
     p.spawnY = y;
+    p.prevY = y;
     p.inventory[0] = weapon_create(WEAPON_SEMIAUTO);
     p.inventory[1] = weapon_create(WEAPON_COUNT);  // empty slot
     p.currentSlot = 0;
@@ -23,6 +24,7 @@ void player_respawn(Player *p) {
     p->y  = p->spawnY;
     p->vx = 0.0f;
     p->vy = 0.0f;
+    p->prevY = p->spawnY;
     p->onGround  = false;
     p->currentSlot   = 0;
     p->groundPlatformIndex = -1;
@@ -79,9 +81,12 @@ void player_handle_combat(Player *p, Bullet *bullets, int maxBullets, float dt) 
 }
 
 // Apply gravity accumulation and integrate vertical position
-void player_update(Player *p, float dt) {
+void player_apply_gravity(Player *p, float dt) {
     p->vy += GRAVITY * dt;
     if (p->vy > TILE_SIZE * 50.0f) p->vy = TILE_SIZE * 50.0f;
+}
+
+void player_integrate_y(Player *p, float dt) {
     p->y += p->vy * dt;
 }
 
@@ -100,7 +105,7 @@ void player_render(Player *p) {
     }
 }
 
-void player_handle_movement(Player *p, int levelWidth, float dt) {
+void player_handle_input(Player *p, float dt) {
     float speed = p->isCrouching ? MOVE_SPEED * 0.5f : MOVE_SPEED;
     bool lockX = IsKeyDown(KEY_W) && p->onGround &&
     !IsKeyDown(KEY_A) && !IsKeyDown(KEY_D);
@@ -113,11 +118,6 @@ void player_handle_movement(Player *p, int levelWidth, float dt) {
 
         if (p->vx >  speed) p->vx =  speed;
         if (p->vx < -speed) p->vx = -speed;
-
-        p->x += p->vx * dt;
-
-        if (p->x < 0.0f) { p->x = 0.0f; p->vx = 0.0f; }
-        if (p->x + TILE_SIZE > levelWidth) { p->x = levelWidth - TILE_SIZE; p->vx = 0.0f; }
     }
 
     if (!IsKeyDown(KEY_A) && !IsKeyDown(KEY_D)) {
@@ -132,4 +132,10 @@ void player_handle_movement(Player *p, int levelWidth, float dt) {
         p->vy = JUMP_FORCE;
         p->onGround = false;
     }
+}
+
+void player_integrate_x(Player *p, int levelWidth, float dt) {
+    p->x += p->vx * dt;
+    if (p->x < 0.0f)                    { p->x = 0.0f;                    p->vx = 0.0f; }
+    if (p->x + TILE_SIZE > levelWidth)  { p->x = levelWidth - TILE_SIZE;  p->vx = 0.0f; }
 }

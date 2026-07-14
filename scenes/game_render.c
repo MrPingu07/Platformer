@@ -55,6 +55,8 @@ void game_render_world(GameState *game) {
     }
     DrawText(TextFormat("RUNNERS  render:%d  logic:%d  total:%d", rendered, active, game->runnerCount), 20, 40, 14, LIME);
     DrawText(TextFormat("TILESET: %s", game->levelTileset), 20, 56, 14, LIME);
+    /////
+    DrawText(TextFormat("vx: %.1f  onGround: %d  vy: %.1f", game->player.vx, game->player.onGround, game->player.vy), 20, 72, 14, LIME);
     #endif
 
     EndDrawing();

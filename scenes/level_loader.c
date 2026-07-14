@@ -176,6 +176,21 @@ LevelData load_level(const char *filename) {
         }
     }
 
+    for (int i = 0; i < data.platformCount; i++) {
+        data.platforms[i].wallLeft  = true;
+        data.platforms[i].wallRight = true;
+        float tileX = data.platforms[i].rect.x;
+        float tileY = data.platforms[i].rect.y;
+        for (int j = 0; j < data.platformCount; j++) {
+            if (i == j) continue;
+            if (data.platforms[j].rect.y != tileY) continue;
+            // Vecino a la izquierda
+            if (data.platforms[j].rect.x + TILE_SIZE == tileX) data.platforms[i].wallLeft  = false;
+            // Vecino a la derecha
+            if (data.platforms[j].rect.x - TILE_SIZE == tileX) data.platforms[i].wallRight = false;
+        }
+    }
+
     fclose(file);
     return data;
 }

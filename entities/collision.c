@@ -1,6 +1,7 @@
 // entities/collision.c
-#include "collision.h"
 #include "../defines.h"
+#include "hittable.h"
+#include "player.h"
 
 void resolve_environment_collisions(Player *p, Rectangle *platforms, int count) {
     float playerH = p->isCrouching ? TILE_SIZE * 0.5f  : TILE_SIZE;
@@ -9,14 +10,34 @@ void resolve_environment_collisions(Player *p, Rectangle *platforms, int count) 
 
     for (int i = 0; i < count; i++) {
         Rectangle playerRect = { p->x + offsetX, p->y + (TILE_SIZE - playerH), playerW, playerH };
+
+        if (p->vy < 0.0f) continue;
+        if (!CheckCollisionRecs(playerRect, platforms[i])) continue;
+        if (p->prevY + TILE_SIZE > platforms[i].y) continue;
+
+        p->y = platforms[i].y - playerH - (TILE_SIZE - playerH);
+        p->vy = 0.0f;
+        p->onGround = true;
+        p->groundPlatformIndex = i;
+    }
+}
+
+// AGREGAR función nueva para plataformas móviles:
+void resolve_moving_platform_collisions(Player *p, Rectangle *platforms, int count, int indexOffset) {
+    float playerH = p->isCrouching ? TILE_SIZE * 0.5f  : TILE_SIZE;
+    float playerW = p->isCrouching ? TILE_SIZE * 1.25f : TILE_SIZE;
+    float offsetX = p->isCrouching ? -TILE_SIZE * 0.125f : 0.0f;
+
+    for (int i = 0; i < count; i++) {
+        Rectangle playerRect = { p->x + offsetX, p->y + (TILE_SIZE - playerH), playerW, playerH };
         if (p->vy >= 0.0f &&
             CheckCollisionRecs(playerRect, platforms[i]) &&
-            (playerRect.y + playerH <= platforms[i].y + 20))
+            (playerRect.y + playerH <= platforms[i].y + TILE_SIZE * 0.5f))
         {
             p->y = platforms[i].y - playerH - (TILE_SIZE - playerH);
-            p->vy = 0;
+            p->vy = 0.0f;
             p->onGround = true;
-            p->groundPlatformIndex = i;
+            p->groundPlatformIndex = indexOffset + i;
         }
     }
 }
@@ -48,3 +69,39 @@ void resolve_bullet_hittable_collisions(Hittable *targets, int targetCount, Bull
         }
     }
 }
+
+void resolve_horizontal_collisions(Player *p, Rectangle *platforms, int count) {
+    float playerH = p->isCrouching ? TILE_SIZE * 0.5f  : TILE_SIZE;
+    float playerW = p->isCrouching ? TILE_SIZE * 1.25f : TILE_SIZE;
+    float offsetX = p->isCrouching ? -TILE_SIZE * 0.125f : 0.0f;
+    Rectangle playerRect = { p->x + offsetX, p->y + (TILE_SIZE - playerH), playerW, playerH };
+
+    for (int i = 0; i < count; i++) {
+        float t = 3.0f;
+
+        // Buscar vecinos en la misma fila
+        bool hasLeft = false, hasRight = false;
+        for (int j = 0; j < count; j++) {
+            if (j == i) continue;
+            if (platforms[j].y != platforms[i].y) continue;
+            if (platforms[j].x + TILE_SIZE == platforms[i].x) hasLeft  = true;
+            if (platforms[j].x - TILE_SIZE == platforms[i].x) hasRight = true;
+        }
+
+        if (!hasLeft) {
+            Rectangle leftWall = { platforms[i].x - t, platforms[i].y, t, TILE_SIZE };
+            if (CheckCollisionRecs(playerRect, leftWall) && p->vx > 0.0f) {
+                p->x = platforms[i].x - playerW - offsetX;
+                if (p->onGround) p->vx = 0.0f;
+            }
+        }
+        if (!hasRight) {
+            Rectangle rightWall = { platforms[i].x + platforms[i].width, platforms[i].y, t, TILE_SIZE };
+            if (CheckCollisionRecs(playerRect, rightWall) && p->vx < 0.0f) {
+                p->x = platforms[i].x + platforms[i].width - offsetX;
+                if (p->onGround) p->vx = 0.0f;
+            }
+        }
+    }
+}
+

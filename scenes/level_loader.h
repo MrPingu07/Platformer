@@ -10,9 +10,11 @@
 #define MAX_RUNNERS   2048
 #define MAX_EXITS     16
 
-typedef struct {
+typedef struct PlatformTile {
     Rectangle rect;
     int       spriteIndex;
+    bool      wallLeft;
+    bool      wallRight;
 } PlatformTile;
 
 typedef struct {

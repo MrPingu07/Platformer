@@ -20,9 +20,12 @@ const char *game_update_world(GameState *game, float dt) {
         game->player.y += game->movingPlatforms[mi].delta.y;
     }
 
-    game->player.onGround = false;
-    game->player.groundPlatformIndex = -1;
     moving_platforms_update(game->movingPlatforms, game->movingPlatformCount, dt);
+    Rectangle staticPlatformRects[MAX_PLATFORMS];
+    for (int i = 0; i < game->platformCount; i++) staticPlatformRects[i] = game->platforms[i].rect;
+
+    Rectangle movingPlatformRects[MAX_MOVING_PLATFORMS];
+    for (int i = 0; i < game->movingPlatformCount; i++) movingPlatformRects[i] = game->movingPlatforms[i].rect;
 
     Rectangle platformRects[MAX_PLATFORMS];
     for (int i = 0; i < game->platformCount; i++) platformRects[i] = game->platforms[i].rect;
@@ -30,14 +33,17 @@ const char *game_update_world(GameState *game, float dt) {
         platformRects[game->platformCount + i] = game->movingPlatforms[i].rect;
     int totalPlatforms = game->platformCount + game->movingPlatformCount;
 
-    player_update(&game->player, dt);
-
-    resolve_environment_collisions(&game->player, platformRects, totalPlatforms);
-    if (game->player.y > game->levelHeight) {
-        player_respawn(&game->player);
-    }
-
-    player_handle_movement(&game->player, game->levelWidth, dt);
+    player_handle_input(&game->player, dt);
+    player_integrate_x(&game->player, game->levelWidth, dt);
+    game->player.onGround = false;
+    game->player.groundPlatformIndex = -1;
+    player_apply_gravity(&game->player, dt);
+    game->player.prevY = game->player.y;
+    player_integrate_y(&game->player, dt);
+    resolve_environment_collisions(&game->player, staticPlatformRects, game->platformCount);
+    resolve_moving_platform_collisions(&game->player, movingPlatformRects, game->movingPlatformCount, game->platformCount);
+    resolve_horizontal_collisions(&game->player, platformRects, totalPlatforms);
+    if (game->player.y > game->levelHeight) { player_respawn(&game->player); }
     player_handle_combat(&game->player, game->bullets, MAX_BULLETS, dt);
     bullets_update(game->bullets, MAX_BULLETS, dt);
 
