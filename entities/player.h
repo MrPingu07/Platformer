@@ -16,8 +16,11 @@ typedef struct {
     float x, y;          // Position in world space
     float vy;            // Vertical velocity (for gravity and jumping)
     float vx;            // Horizontal velocity (player features momentum)
+    float prevFrameX;
+    float prevFrameY;
     float spawnX, spawnY; //Spawnwing coordinates
     bool onGround;       // Flag to check if the player is touching a platform
+    bool wasGroundedLastFrame;
     float prevY;         // Precious Y coordinates
     int facing;          // Look direction: 1 for Right, -1 for Left
 

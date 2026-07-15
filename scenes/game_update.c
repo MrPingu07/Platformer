@@ -33,8 +33,12 @@ const char *game_update_world(GameState *game, float dt) {
         platformRects[game->platformCount + i] = game->movingPlatforms[i].rect;
     int totalPlatforms = game->platformCount + game->movingPlatformCount;
 
+    game->player.prevFrameX = game->player.x;
+    game->player.prevFrameY = game->player.y;
+
     player_handle_input(&game->player, dt);
     player_integrate_x(&game->player, game->levelWidth, dt);
+    game->player.wasGroundedLastFrame = game->player.onGround;
     game->player.onGround = false;
     game->player.groundPlatformIndex = -1;
     player_apply_gravity(&game->player, dt);

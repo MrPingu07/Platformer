@@ -77,6 +77,9 @@ void resolve_horizontal_collisions(Player *p, Rectangle *platforms, int count) {
     Rectangle playerRect = { p->x + offsetX, p->y + (TILE_SIZE - playerH), playerW, playerH };
 
     for (int i = 0; i < count; i++) {
+        float prevPlayerY = p->prevFrameY + (TILE_SIZE - playerH);
+        Rectangle prevRect = { p->prevFrameX + offsetX, prevPlayerY, playerW, playerH };
+        if (CheckCollisionRecs(prevRect, platforms[i])) continue;
         float t = 3.0f;
 
         // Buscar vecinos en la misma fila
@@ -92,14 +95,14 @@ void resolve_horizontal_collisions(Player *p, Rectangle *platforms, int count) {
             Rectangle leftWall = { platforms[i].x - t, platforms[i].y, t, TILE_SIZE };
             if (CheckCollisionRecs(playerRect, leftWall) && p->vx > 0.0f) {
                 p->x = platforms[i].x - playerW - offsetX;
-                if (p->onGround) p->vx = 0.0f;
+                p->vx = 0.0f;
             }
         }
         if (!hasRight) {
             Rectangle rightWall = { platforms[i].x + platforms[i].width, platforms[i].y, t, TILE_SIZE };
             if (CheckCollisionRecs(playerRect, rightWall) && p->vx < 0.0f) {
                 p->x = platforms[i].x + platforms[i].width - offsetX;
-                if (p->onGround) p->vx = 0.0f;
+                p->vx = 0.0f;
             }
         }
     }

@@ -1,29 +1,19 @@
 # Roadmap
 
-## En progreso — Bug activo
-**Bloqueo total de input horizontal en el aire al tocar pared lateral.**
-
-`resolve_horizontal_collisions` corrige `p->x` cada frame mientras haya overlap con
-la zona delgada de pared (`t = 3.0f`), incluso cuando `player_integrate_x` ya movió
-al player en dirección de salir. La aceleración de aire (`AIR_ACCELERATION`) es
-insuficiente para escapar los 3px de la zona en un solo frame, generando un loop de
-re-detección → re-corrección que ancla al player hasta tocar el suelo.
-
-`vx` sí cambia correctamente frame a frame (fricción, input) — el problema es que la
-posición se fuerza de vuelta al borde sin importar hacia dónde apunta el movimiento.
-
-Próximo intento: guardar `prevX` (igual que `prevY`) y solo corregir posición si el
-player se movió genuinamente hacia adentro de la pared respecto al frame anterior,
-no solo por overlap estático.
+## En progreso
+_nada actualmente_
 
 ---
 
 ## Pendiente
 
 ### Bugs
-- Bloqueo de input horizontal en el aire (ver arriba) — prioridad alta.
-- Tunneling a velocidades altas — player, runners, posiblemente drops.
-- Runners y drops no tienen colisión horizontal por eje separado, solo vertical.
+- Snap cosmético menor al pegarse a una pared lateral: si el player se acerca lo
+  suficiente y mantiene input hacia la pared, la corrección de posición final se
+  aplica de una vez en vez de interpolada, generando un pequeño "tirón" perceptible
+  solo si se busca a propósito. No afecta gameplay. Aceptado, no se va a arreglar
+  por ahora.
+- Enemigos y drops no tienen colisión horizontal por eje separado, solo vertical.
 - Colisión horizontal no aplica rider logic a plataformas móviles (no detecta pared
   si el player está parado sobre una plataforma en movimiento).
 
@@ -59,8 +49,17 @@ Plataforma rompible (token `X`, estados IDLE→SHAKING→BROKEN) — no implemen
 - Level select paginado
 - Refactor game.c en submódulos (init/update/render/state)
 - Physics pipeline separado por eje (X e Y integrados independientemente)
-- One-way platforms verticales (estáticas y móviles, funciones separadas)
-- Colisión horizontal con detección de vecino (solo caras expuestas al aire)
-- Fix: win condition invertida en game_update
-- Fix: tamaño de partículas del flamethrower
-- Fix: doble integración de gravedad/Y (bug de duplicación de llamada)
+- One-way platforms verticales (estáticas y móviles, funciones separadas, usan prevY)
+- **Colisión horizontal robusta y funcional**
+  - Detección de vecino por fila: solo caras expuestas al aire bloquean (tiles
+    contiguos forman una superficie continua, no una grilla de paredes internas)
+  - Corrección solo aplica cuando el movimiento (`vx`) apunta genuinamente hacia
+    la pared, no al alejarse — evita el bloqueo de input residual
+  - `vx` se resetea a 0 incondicionalmente al chocar (tanto en aire como en suelo),
+    eliminando el "arrastre" de velocidad vieja al invertir dirección
+  - Guard anti-embebido: compara el rect del player en el frame anterior
+    (`prevFrameX`/`prevFrameY`) contra el tile — si ya había overlap, se sigue
+    tratando como fantasma. Resuelve el caso de saltar dentro de un tile de borde
+    desde abajo sin generar teleports al presionar la dirección de entrada
+  - Funciona de forma consistente en suelo y aire, subiendo o cayendo
+

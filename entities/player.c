@@ -12,6 +12,8 @@ Player player_init(float x, float y) {
     p.spawnX = x;
     p.spawnY = y;
     p.prevY = y;
+    p.prevFrameX = x;
+    p.prevFrameY = y;
     p.inventory[0] = weapon_create(WEAPON_SEMIAUTO);
     p.inventory[1] = weapon_create(WEAPON_COUNT);  // empty slot
     p.currentSlot = 0;
@@ -25,6 +27,8 @@ void player_respawn(Player *p) {
     p->vx = 0.0f;
     p->vy = 0.0f;
     p->prevY = p->spawnY;
+    p->prevFrameX = p->spawnX;
+    p->prevFrameY = p->spawnY;
     p->onGround  = false;
     p->currentSlot   = 0;
     p->groundPlatformIndex = -1;
