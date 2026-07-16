@@ -14,11 +14,23 @@
 #include <string.h>
 
 const char *game_update_world(GameState *game, float dt) {
-    if (game->player.groundPlatformIndex >= game->platformCount && game->player.groundPlatformIndex != -1) {
+    game->player.prevFrameX = game->player.x;
+    game->player.prevFrameY = game->player.y;
+
+    if (game->player.groundPlatformIndex >= game->platformCount &&
+        game->player.groundPlatformIndex != -1) {
+
         int mi = game->player.groundPlatformIndex - game->platformCount;
-        game->player.x += game->movingPlatforms[mi].delta.x;
-        game->player.y += game->movingPlatforms[mi].delta.y;
-    }
+
+    game->player.x += game->movingPlatforms[mi].delta.x;
+    game->player.y += game->movingPlatforms[mi].delta.y;
+
+    // El movimiento fue impuesto por la plataforma.
+    // Actualizamos también la posición previa para que el sistema de
+    // colisiones no lo interprete como un movimiento propio del jugador.
+    game->player.prevFrameX += game->movingPlatforms[mi].delta.x;
+    game->player.prevFrameY += game->movingPlatforms[mi].delta.y;
+        }
 
     moving_platforms_update(game->movingPlatforms, game->movingPlatformCount, dt);
     Rectangle staticPlatformRects[MAX_PLATFORMS];
@@ -33,9 +45,6 @@ const char *game_update_world(GameState *game, float dt) {
         platformRects[game->platformCount + i] = game->movingPlatforms[i].rect;
     int totalPlatforms = game->platformCount + game->movingPlatformCount;
 
-    game->player.prevFrameX = game->player.x;
-    game->player.prevFrameY = game->player.y;
-
     player_handle_input(&game->player, dt);
     player_integrate_x(&game->player, game->levelWidth, dt);
     game->player.wasGroundedLastFrame = game->player.onGround;
@@ -47,6 +56,11 @@ const char *game_update_world(GameState *game, float dt) {
     resolve_environment_collisions(&game->player, staticPlatformRects, game->platformCount);
     resolve_moving_platform_collisions(&game->player, movingPlatformRects, game->movingPlatformCount, game->platformCount);
     resolve_horizontal_collisions(&game->player, platformRects, totalPlatforms);
+    if (game->player.onGround &&
+        player_is_buried(&game->player, platformRects, totalPlatforms))
+    {
+        player_respawn(&game->player);
+    }
     if (game->player.y > game->levelHeight) { player_respawn(&game->player); }
     player_handle_combat(&game->player, game->bullets, MAX_BULLETS, dt);
     bullets_update(game->bullets, MAX_BULLETS, dt);

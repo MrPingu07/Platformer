@@ -2,6 +2,7 @@
 #include "../defines.h"
 #include "hittable.h"
 #include "player.h"
+#include <math.h>
 
 void resolve_environment_collisions(Player *p, Rectangle *platforms, int count) {
     float playerH = p->isCrouching ? TILE_SIZE * 0.5f  : TILE_SIZE;
@@ -15,6 +16,17 @@ void resolve_environment_collisions(Player *p, Rectangle *platforms, int count) 
         if (!CheckCollisionRecs(playerRect, platforms[i])) continue;
         if (p->prevY + TILE_SIZE > platforms[i].y) continue;
 
+        // Debe existir superposición horizontal significativa.
+        // Evita aterrizar apoyándose sólo en el costado del tile.
+        float overlap =
+        fminf(playerRect.x + playerRect.width,
+              platforms[i].x + platforms[i].width)
+        - fmaxf(playerRect.x,
+                platforms[i].x);
+
+        if (overlap < 4.0f)
+            continue;
+
         p->y = platforms[i].y - playerH - (TILE_SIZE - playerH);
         p->vy = 0.0f;
         p->onGround = true;
@@ -22,7 +34,7 @@ void resolve_environment_collisions(Player *p, Rectangle *platforms, int count) 
     }
 }
 
-// AGREGAR función nueva para plataformas móviles:
+// función para plataformas móviles:
 void resolve_moving_platform_collisions(Player *p, Rectangle *platforms, int count, int indexOffset) {
     float playerH = p->isCrouching ? TILE_SIZE * 0.5f  : TILE_SIZE;
     float playerW = p->isCrouching ? TILE_SIZE * 1.25f : TILE_SIZE;
@@ -77,9 +89,6 @@ void resolve_horizontal_collisions(Player *p, Rectangle *platforms, int count) {
     Rectangle playerRect = { p->x + offsetX, p->y + (TILE_SIZE - playerH), playerW, playerH };
 
     for (int i = 0; i < count; i++) {
-        float prevPlayerY = p->prevFrameY + (TILE_SIZE - playerH);
-        Rectangle prevRect = { p->prevFrameX + offsetX, prevPlayerY, playerW, playerH };
-        if (CheckCollisionRecs(prevRect, platforms[i])) continue;
         float t = 3.0f;
 
         // Buscar vecinos en la misma fila
@@ -91,20 +100,100 @@ void resolve_horizontal_collisions(Player *p, Rectangle *platforms, int count) {
             if (platforms[j].x - TILE_SIZE == platforms[i].x) hasRight = true;
         }
 
+        float dx = p->x - p->prevFrameX;
+
+        Rectangle prevRect = {
+            p->prevFrameX + offsetX,
+            p->y + (TILE_SIZE - playerH),
+            playerW,
+            playerH
+        };
+
         if (!hasLeft) {
-            Rectangle leftWall = { platforms[i].x - t, platforms[i].y, t, TILE_SIZE };
-            if (CheckCollisionRecs(playerRect, leftWall) && p->vx > 0.0f) {
-                p->x = platforms[i].x - playerW - offsetX;
-                p->vx = 0.0f;
+            float wallX = platforms[i].x;
+
+            float prevRight = p->prevFrameX + offsetX + playerW;
+            float currRight = p->x + offsetX + playerW;
+
+            if (prevRight <= wallX &&
+                currRight > wallX &&
+                CheckCollisionRecs(playerRect, platforms[i]))
+            {
+                p->x = wallX - playerW - offsetX;
+                if (p->vx > 0.0f) p->vx = 0.0f;
             }
         }
+
         if (!hasRight) {
-            Rectangle rightWall = { platforms[i].x + platforms[i].width, platforms[i].y, t, TILE_SIZE };
-            if (CheckCollisionRecs(playerRect, rightWall) && p->vx < 0.0f) {
-                p->x = platforms[i].x + platforms[i].width - offsetX;
-                p->vx = 0.0f;
+            float wallX = platforms[i].x + platforms[i].width;
+
+            float prevLeft = p->prevFrameX + offsetX;
+            float currLeft = p->x + offsetX;
+
+            if (prevLeft >= wallX &&
+                currLeft < wallX &&
+                CheckCollisionRecs(playerRect, platforms[i]))
+            {
+                p->x = wallX - offsetX;
+                if (p->vx < 0.0f) p->vx = 0.0f;
             }
         }
     }
 }
 
+// Returns true when the player has become buried inside level geometry.
+// This is considered an invalid gameplay state.
+bool player_is_buried(Player *p, Rectangle *platforms, int count) {
+    float playerH = p->isCrouching ? TILE_SIZE * 0.5f  : TILE_SIZE;
+    float playerW = p->isCrouching ? TILE_SIZE * 1.25f : TILE_SIZE;
+    float offsetX = p->isCrouching ? -TILE_SIZE * 0.125f : 0.0f;
+
+    Rectangle playerRect = {
+        p->x + offsetX,
+        p->y + (TILE_SIZE - playerH),
+        playerW,
+        playerH
+    };
+
+    Rectangle leftProbe = {
+        playerRect.x - 1.0f,
+        playerRect.y + 1.0f,
+        1.0f,
+        playerRect.height - 2.0f
+    };
+
+    Rectangle rightProbe = {
+        playerRect.x + playerRect.width,
+        playerRect.y + 1.0f,
+        1.0f,
+        playerRect.height - 2.0f
+    };
+
+    Rectangle topProbe = {
+        playerRect.x + 1.0f,
+        playerRect.y - 1.0f,
+        playerRect.width - 2.0f,
+        1.0f
+    };
+
+    Rectangle bottomProbe = {
+        playerRect.x + 1.0f,
+        playerRect.y + playerRect.height,
+        playerRect.width - 2.0f,
+        1.0f
+    };
+
+    bool left = false;
+    bool right = false;
+    bool top = false;
+    bool bottom = false;
+
+    for (int i = 0; i < count; i++) {
+        if (!left   && CheckCollisionRecs(leftProbe,   platforms[i])) left = true;
+        if (!right  && CheckCollisionRecs(rightProbe,  platforms[i])) right = true;
+        if (!top    && CheckCollisionRecs(topProbe,    platforms[i])) top = true;
+        if (!bottom && CheckCollisionRecs(bottomProbe, platforms[i])) bottom = true;
+    }
+
+    return left && right && top && bottom;
+}
