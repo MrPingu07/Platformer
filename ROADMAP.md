@@ -6,7 +6,7 @@ _nada actualmente_
 ---
 
 ## Pendiente
-- Fix a bug: Si estas parado en una plataforma en movimiento y te toca la cara lateral de otra plataforma en movimiento, no te empuja. Debería. Por ahora solo resetea la aceleracion en eje X del player a 0.
+- Fix a bug: Si no estas Onground, las plataformas en movimiento no tienen colision en las caras Izquierda ni Derecha. Se debe tener en cuenta que "Plataformas" se entiende por un conjunto de tiles. Por lo que se deben evitar implementaciones que averien el one-way dandole colisiones laterales a every single one de los tiles, entorpeciendo el movimiento horizontal.
 
 ### Bugs
 - Snap cosmético menor al pegarse a una pared lateral: si el player se acerca lo
@@ -51,4 +51,4 @@ implementación real de carga/render por tileset. Se usan colores placeholder ha
 - Physics pipeline separado por eje (X e Y integrados independientemente)
 - One-way platforms verticales (estáticas y móviles, funciones separadas, usan prevY)
 - Colisión horizontal robusta y funcional
-
+- Fallback en caso de quedar atrapado en geometria del mundo

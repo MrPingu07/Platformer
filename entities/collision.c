@@ -3,6 +3,7 @@
 #include "hittable.h"
 #include "player.h"
 #include <math.h>
+#include "../scenes/moving_platform.h"
 
 void resolve_environment_collisions(Player *p, Rectangle *platforms, int count) {
     float playerH = p->isCrouching ? TILE_SIZE * 0.5f  : TILE_SIZE;
@@ -35,21 +36,57 @@ void resolve_environment_collisions(Player *p, Rectangle *platforms, int count) 
 }
 
 // función para plataformas móviles:
-void resolve_moving_platform_collisions(Player *p, Rectangle *platforms, int count, int indexOffset) {
+void resolve_moving_platform_collisions(Player *p, MovingPlatform *platforms, int count, int indexOffset) {
     float playerH = p->isCrouching ? TILE_SIZE * 0.5f  : TILE_SIZE;
     float playerW = p->isCrouching ? TILE_SIZE * 1.25f : TILE_SIZE;
     float offsetX = p->isCrouching ? -TILE_SIZE * 0.125f : 0.0f;
 
+    // --- Pasada 1: resolución vertical para todas las plataformas ---
     for (int i = 0; i < count; i++) {
+        Rectangle rect = platforms[i].rect;
         Rectangle playerRect = { p->x + offsetX, p->y + (TILE_SIZE - playerH), playerW, playerH };
+
+        float prevPlatformY = rect.y - platforms[i].delta.y;
+
         if (p->vy >= 0.0f &&
-            CheckCollisionRecs(playerRect, platforms[i]) &&
-            (playerRect.y + playerH <= platforms[i].y + TILE_SIZE * 0.5f))
+            CheckCollisionRecs(playerRect, rect) &&
+            (playerRect.y + playerH <= rect.y + TILE_SIZE * 0.5f) &&
+            (p->prevY + playerH <= prevPlatformY))
         {
-            p->y = platforms[i].y - playerH - (TILE_SIZE - playerH);
+            p->y = rect.y - playerH - (TILE_SIZE - playerH);
             p->vy = 0.0f;
             p->onGround = true;
             p->groundPlatformIndex = indexOffset + i;
+        }
+
+    }
+
+    // --- Pasada 2: empuje lateral ---
+    // Solo aplica si el jugador ya está apoyado en algo. En el aire puede
+    // estar atravesando una plataforma one-way desde abajo, y ahí no debe
+    // haber ningún contacto lateral, sin importar el solapamiento momentáneo.
+    // El caso de colisión lateral en el aire queda pendiente como ticket
+    // separado (requiere tracking de overlap entre frames, no resoluble
+    // con geometría de un solo frame cuando las plataformas están alineadas).
+    if (!p->onGround) return;
+    for (int i = 0; i < count; i++) {
+        if (p->groundPlatformIndex == indexOffset + i) continue;
+        Rectangle rect = platforms[i].rect;
+        Rectangle playerRect = { p->x + offsetX, p->y + (TILE_SIZE - playerH), playerW, playerH };
+        if (!CheckCollisionRecs(playerRect, rect)) continue;
+
+        // Resolución por penetración mínima: no depende de prevFrameX,
+        // así que no se ve afectada por el shift de ride-along de otras
+        // plataformas. El lado con menor solapamiento es el lado real
+        // de contacto.
+        float overlapLeft  = (playerRect.x + playerRect.width) - rect.x;
+        float overlapRight = (rect.x + rect.width) - playerRect.x;
+        if (overlapLeft < overlapRight) {
+            p->x = rect.x - playerW - offsetX;
+            if (p->vx > 0.0f) p->vx = 0.0f;
+        } else {
+            p->x = rect.x + rect.width - offsetX;
+            if (p->vx < 0.0f) p->vx = 0.0f;
         }
     }
 }

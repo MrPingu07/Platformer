@@ -54,8 +54,8 @@ const char *game_update_world(GameState *game, float dt) {
     game->player.prevY = game->player.y;
     player_integrate_y(&game->player, dt);
     resolve_environment_collisions(&game->player, staticPlatformRects, game->platformCount);
-    resolve_moving_platform_collisions(&game->player, movingPlatformRects, game->movingPlatformCount, game->platformCount);
-    resolve_horizontal_collisions(&game->player, platformRects, totalPlatforms);
+    resolve_moving_platform_collisions(&game->player, game->movingPlatforms, game->movingPlatformCount, game->platformCount);
+    resolve_horizontal_collisions(&game->player, staticPlatformRects, game->platformCount);
     if (game->player.onGround &&
         player_is_buried(&game->player, platformRects, totalPlatforms))
     {
