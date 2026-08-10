@@ -27,9 +27,6 @@ void game_render_world(GameState *game) {
         runner_render(&game->runners[i]);
     }
 
-    for (int i = 0; i < game->exitCount; i++)
-        DrawRectangleRec(game->exits[i].rect, BLACK);
-
     for (int i = 0; i < game->exitCount; i++) {
         bool conditionMet = true;
         if (strcmp(game->winCondition, "kill_all") == 0)

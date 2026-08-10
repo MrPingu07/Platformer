@@ -126,7 +126,6 @@ void resolve_horizontal_collisions(Player *p, Rectangle *platforms, int count) {
     Rectangle playerRect = { p->x + offsetX, p->y + (TILE_SIZE - playerH), playerW, playerH };
 
     for (int i = 0; i < count; i++) {
-        float t = 3.0f;
 
         // Buscar vecinos en la misma fila
         bool hasLeft = false, hasRight = false;

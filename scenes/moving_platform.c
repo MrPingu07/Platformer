@@ -18,7 +18,6 @@ void moving_platform_update(MovingPlatform *mp, float dt) {
     float tSpeed = compute_tspeed(mp);
     if (tSpeed < 0.001f) return; // plataforma estática, sin path
     mp->delta = (Vector2){ 0.0f, 0.0f };
-    if (tSpeed < 0.001f) return;
 
     // Aceleración y deceleración en unidades de tSpeed/s
     // accel/decel son segundos para alcanzar tSpeed → tAccel = tSpeed / accel

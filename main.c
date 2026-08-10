@@ -1,7 +1,6 @@
 // main.c
 #include <raylib.h>
 #include "scene_manager.h"
-#include "scene_manager.h"
 #include "scenes/menu.h"
 #include "scenes/resolution.h"
 
