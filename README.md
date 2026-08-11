@@ -213,11 +213,6 @@ a grid of individual walls.
 Static and moving platforms use separate resolution functions because moving
 platforms require a margin-based approach immune to frame-rate-dependent position deltas.
 
-**Known issue:** horizontal wall resolution can pin the player's horizontal input
-while airborne and in contact with a lateral wall, since air acceleration may be too
-low to escape the contact zone before the next frame re-triggers correction. Tracked
-in ROADMAP.
-
 ### Polymorphic Weapon Dispatch
 
 Weapons bind a `fireFunc` callback at creation time.
