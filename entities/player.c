@@ -18,6 +18,11 @@ Player player_init(float x, float y) {
     p.inventory[1] = weapon_create(WEAPON_COUNT);  // empty slot
     p.currentSlot = 0;
     p.groundPlatformIndex = -1;
+    p.lateralPushVel = 0.0f;
+    p.pushTimer = 0.0f;
+    p.accelFactor = 1.0f;
+    p.pushLocked = false;
+    p.pushDir = 0.0f;
     return p;
 }
 
@@ -32,6 +37,11 @@ void player_respawn(Player *p) {
     p->onGround  = false;
     p->currentSlot   = 0;
     p->groundPlatformIndex = -1;
+    p->lateralPushVel = 0.0f;
+    p->pushTimer = 0.0f;
+    p->accelFactor = 1.0f;
+    p->pushLocked = false;
+    p->pushDir = 0.0f;
     p->inventory[0]  = weapon_create(WEAPON_SEMIAUTO);
     p->inventory[1]  = weapon_create(WEAPON_COUNT);
 }
@@ -115,7 +125,7 @@ void player_handle_input(Player *p, float dt) {
     !IsKeyDown(KEY_A) && !IsKeyDown(KEY_D);
 
     if (!lockX) {
-        float accel = p->onGround ? ACCELERATION : AIR_ACCELERATION;
+        float accel = (p->onGround ? ACCELERATION : AIR_ACCELERATION) * p->accelFactor;
 
         if (IsKeyDown(KEY_D)) { p->vx += accel * dt; p->facing =  1; }
         else if (IsKeyDown(KEY_A)) { p->vx -= accel * dt; p->facing = -1; }

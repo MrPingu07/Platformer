@@ -28,6 +28,11 @@ typedef struct {
     Vector2 aimDir;   // Normalized direction vector for current aim
     bool isCrouching;
     int  groundPlatformIndex;
+    float lateralPushVel;   // Velocidad de corrección lateral gradual (ease in/out)
+    float pushTimer;        // Tiempo acumulado tocando una cara lateral (segundos)
+    float accelFactor;      // Multiplicador de aceleración por input (1.0 = control total)
+    bool  pushLocked;       // true mientras se resuelve un empuje que no debe soltar
+    float pushDir;          // Dirección fija del empuje mientras el lock esté activo (-1 / +1)
 
     // Combat & Inventory system
     Weapon inventory[2]; // Two available weapon slots
