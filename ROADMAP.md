@@ -6,7 +6,7 @@ _nada actualmente_
 ---
 
 ## Pendiente
-- Fix a bug: Si no estas Onground, las plataformas en movimiento no tienen colision en las caras Izquierda ni Derecha. Se debe tener en cuenta que "Plataformas" se entiende por un conjunto de tiles. Por lo que se deben evitar implementaciones que averien el one-way dandole colisiones laterales a every single one de los tiles, entorpeciendo el movimiento horizontal.
+- Fix a bug: Si estas Onground, EN UNA PLATAFORMA EN MOVIMIENTO, plataformas en movimiento no tienen colision en las caras Izquierda ni Derecha. Se debe tener en cuenta que "Plataformas" se entiende por un conjunto de tiles. Por lo que se deben evitar implementaciones que averien el one-way dandole colisiones laterales a every single one de los tiles, entorpeciendo el movimiento horizontal.
 
 ### Bugs
 - Snap cosmético menor al pegarse a una pared lateral: si el player se acerca lo
